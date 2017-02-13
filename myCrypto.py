@@ -82,13 +82,17 @@ rho={
 }
 
 
-def myRipeMD160(input):
-	length=int(len(input)*math.log(16,2))
+def myRipeMD160(test_input):
+	rinput=hashlib.sha256(test_input.decode('hex')).digest()
+
+	length=int(len(rinput)*math.log(16,2))
 	print 'bit size {}'.format(length)
 	ripemd160 = hashlib.new('ripemd160')
-	ripemd160.update(input)
+	ripemd160.update(rinput)
 	ripe=utils.base58CheckEncode(0, ripemd160.digest())
 
+	
+        input=hashlib.sha256(test_input.decode('hex')).hexdigest()
 
 
 	#pad messages so its length is 448 mod 512
@@ -98,21 +102,28 @@ def myRipeMD160(input):
 	#print "hex? {}".format(int(input,16))
 	binput=bin(int(input,16))[2:]
 	print binput
-	#print type(binput)
+	print type(binput)
 
         #append a 64 bit length value to message
         blength=bin(length)[2:].zfill(64)
 	binput=binput.ljust(length+1,'1').ljust(448,'0')+blength
 	print 'bit size {}'.format(len(binput))
 	print 'message length {}'.format(binput)
-	hinput=hex(int(binput,2))[2:]
+	hinput=hex(int(binput,2))[2:-1]
         print 'message length {}'.format(hinput)
 
+	#binput_check=bin(int(hinput,16))[2:]
+        #print 'binput_check {}'.format(binput_check)
+        #print type(binput_check)
+
+	
 	
 
 	#split message to 16 32-bit blocks for X[]
-	X=[hinput[i:i+2] for i in range(0, len(hinput)-1, 2)]
+	X=[hinput[i:i+8] for i in range(0, len(hinput)-1, 8)]
 	print 'split message {}'.format(X)
+
+
 	#initialise 5 word 160 bit buffer (ABCDE) to ()
 	Ai=int('67452301',16)
 	Bi=int('efcdab89',16)
@@ -157,20 +168,10 @@ def myRipeMD160(input):
 
 
 			#left
-			A_out,C_out=operation(A,B,C,D,E,functionmap_left.get(round, "nothing"),Xl,K,s)
-			A=E
-			B=A_out
-			C=B
-			D=C_out
-			E=D
+			A,B,C,D,E=compression(A,B,C,D,E,functionmap_left.get(round, "nothing"),Xl,K,s)
 
-                        #right
-                        Ar_out,Cr_out=operation(Ar,Br,Cr,Dr,Er,functionmap_right.get(round, "nothing"),Xr,Kr,sr)
-                        Ar=Er
-                        Br=Ar_out
-                        Cr=Br
-                        Dr=Cr_out
-                        Er=Dr
+                       #right
+                        Ar,Br,Cr,Dr,Er=compression(Ar,Br,Cr,Dr,Er,functionmap_right.get(round, "nothing"),Xr,K,s)
 #		next?
 
 
@@ -200,7 +201,12 @@ def myRipeMD160(input):
 	return ripe
 
 def compression(A,B,C,D,E,f,X,K,s):
-	
+	A_out,C_out=operation(A,B,C,D,E,f,X,K,s)
+        A=E
+        B=A_out
+        C=B
+        D=C_out
+        E=D
 	return A,B,C,D,E
 
 def operation(A,B,C,D,E,f,X,K,s):

@@ -28,13 +28,15 @@ print 'MyTransaction pkHashStep2 {}'.format(pkHashStep2)
 
 
 
-pkHashStep21=hashlib.sha256(public_key.decode('hex')).hexdigest()
+pkHashStep21=hashlib.sha256(public_key.decode('hex')).digest()
 print 'MyTransaction pkHashStep1 {}'.format(pkHashStep21)
 print len(pkHashStep21)
 print 'pkHashStep1 {}'.format(type(pkHashStep21))
 
 
-pkHashStep22=myCrypto.myRipeMD160(pkHashStep21)
+#pkHashStep22=myCrypto.myRipeMD160(pkHashStep21)
+pkHashStep22=myCrypto.myRipeMD160(public_key)
+
 print 'MyTransaction pkHashStep2 {}'.format(pkHashStep22)
 
 
