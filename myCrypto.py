@@ -122,20 +122,9 @@ def myRipeMD160(public_key):
         blength=bin(length)[2:].zfill(64)
 	blength_little_end=''
 
-	print ''
-	print ''
-	print ''
-	print ''
-	print 'len(blength)/32 {}'.format(len(blength)/32)
-	print 'blength[32*0:32*(0+1)] {}'.format(blength[32*0:32*(0+1)])
-	print 'blength[32*1:32*(1+1)] {}'.format(blength[32*1:32*(1+1)])
-	print ''
-	print ''
-	print ''
-
 
 	for x in range(len(blength)/32):
-        	blength_little_end += little_end(blength[32*x:32*(x+1)])
+        	blength_little_end += little_end(blength[32*x:32*(x+1)],2)
 	print 'bmessage bit blength {}'.format(blength)
 	print 'bmessage bit blength_little_end {}'.format(blength_little_end)
 	
