@@ -129,8 +129,8 @@ def myRipeMD160(public_key):
 	print 'bmessage bit blength_little_end {}'.format(blength_little_end)
 	
 	#append zeros and length
-	bmessage=bmessage.ljust(length+1,'1').ljust(448,'0')+blength_little_end[32:]+blength_little_end[:32]
-	#bmessage=bmessage.ljust(length+1,'1').ljust(448,'0')+blength[32*1:32*(1+1)]+blength[32*0:32*(0+1)]
+	#bmessage=bmessage.ljust(length+1,'1').ljust(448,'0')+blength_little_end[32:]+blength_little_end[:32]
+	bmessage=bmessage.ljust(length+1,'1').ljust(448,'0')+blength[32*1:32*(1+1)]+blength[32*0:32*(0+1)]
 	print 'new bmessage {}'.format(bmessage)
 	print 'new bmessage bit length {}'.format(len(bmessage))
 
@@ -196,17 +196,12 @@ def myRipeMD160(public_key):
 			#s
 			s=shiftmap_left.get(round*16+j,"nothing")
                         sr=shiftmap_right.get(round*16+j,"nothing")
-			if round==4:
-				print 'round {} j {}, K {}, s {}, r {} rr {}'.format(round,j,K,s,r,rr)
-				print 'h_left {} {} {} {} {}'.format(hex(A),hex(B),hex(C),hex(D),hex(E))
-				print 'h_right {} {} {} {} {}'.format(hex(A),hex(B),hex(C),hex(D),hex(E))
-				print 'X {}'.format(hex(Xl))
+			print 'round {} j {}, K {}, s {}, r {} rr {}'.format(round,j,K,s,r,rr)
+			print 'h_initial {} {} {} {} {}'.format(hex(A),hex(B),hex(C),hex(D),hex(E))
 			#left
-			print 'left'
 			A,B,C,D,E=compression(A,B,C,D,E,functionmap_left.get(round, "nothing"),Xl,K,s)
-			print ''
+
                         #right
-			print 'right'
                         Ar,Br,Cr,Dr,Er=compression(Ar,Br,Cr,Dr,Er,functionmap_right.get(round, "nothing"),Xr,Kr,sr)
 
 	print 'loop finished'
@@ -248,7 +243,6 @@ def operation(A,B,C,D,E,f,X,K,s):
 	A_out=A
 	if f==1:
 		A_out=(A_out+function1(B,C,D))%mask
-		print ' A_out F1 {}'.format(hex(A_out))
 	elif f==2:
                 A_out=(A_out+function2(B,C,D))%mask
         elif f==3:
@@ -257,105 +251,39 @@ def operation(A,B,C,D,E,f,X,K,s):
                 A_out=(A_out+function4(B,C,D))%mask
         elif f==5:
                 A_out=(A_out+function5(B,C,D))%mask
-		print ' A_out F5 {}'.format(hex(A_out))
-	A_out000=(A_out+X)%mask
-	A_out00=(A_out000+K)%mask
-	if f==1:
-		print 'A_out000 {}'.format(hex(A_out000))
-		print ' A_out00 {}'.format(hex(A_out00))
-	if f==5:
-		print 'A_out000 {}'.format(hex(A_out000))
-		print ' A_out00 {}'.format(hex(A_out00))
-	A_out0=cyclicShift(A_out00,s)%mask
-	A_out1=(A_out0+E)%mask
+	A_out=(A_out+X)%mask
+	A_out=(A_out+K)%mask
+	A_out=cyclicShift(A_out,s)%mask
+	A_out=(A_out+E)%mask
 	C_out=cyclicShift(C,10)%mask
-	if f==1:
-		print ' ROL {}'.format(hex(A_out0))
-		print ' T {}'.format(hex(A_out1))
-		print ' ROL(C) {}'.format(hex(C_out))
-	return A_out1%mask,C_out%mask
+	return A_out%mask,C_out%mask
 
 def ordering(i):
 	return ordermap.get(i, "nothing")
 
 def function1(B,C,D):
-#	print 'function 1'
-	binB=int(bin(B)[2:],2)
-	
-        binC=int(bin(C)[2:],2)
-
-        binD=int(bin(D)[2:],2)
-#	print 'binB {}'.format(binB)
-#        print 'binC {}'.format(binC)
-#        print 'binD {}'.format(binD)
-
-        num=binB^binC^binD
-	#print 'B {}'.format(int(bin(B)))
-        #print 'C {}'.format(bin(C))
-        #print 'D {}'.format(bin(D))
-	#num=bin(bin(B)^bin(C)^bin(D))
-	print 'F1 {}'.format(hex(num))
+        num=B^C^D
 	return num
 
 def function2(B,C,D):
-
-#        print 'function 2'
-        binB=int(bin(B)[2:],2)
-
-        binC=int(bin(C)[2:],2)
-
-        binD=int(bin(D)[2:],2)
-        num=(binB&binC)|(~binB&binD)
-
-#        num=bin((bin(B)&bin(C))|(~bin(B)&bin(D)))
+        num=(B&C)|(~B&D)
         return num
 
 def function3(B,C,D):
-#        print 'function 3'
-        binB=int(bin(B)[2:],2)
-
-        binC=int(bin(C)[2:],2)
-
-        binD=int(bin(D)[2:],2)
-        num=(binB|~binC)^binD
-
-#        num=bin((bin(B)|~bin(C))^bin(D))
+        num=(B|~C)^D
         return num
-
 
 def function4(B,C,D):
-#        print 'function 4'
-        binB=int(bin(B)[2:],2)
-
-        binC=int(bin(C)[2:],2)
-
-        binD=int(bin(D)[2:],2)
-        num=(binB&binD)|(binC&~binD)
-
-#        num=bin((bin(B)&bin(D))|(bin(C)&~bin(D)))
+        num=(B&D)|(C&~D)
         return num
 
-
 def function5(B,C,D):
-#        print 'function 5'
-        binB=int(bin(B)[2:],2)
-
-        binC=int(bin(C)[2:],2)
-
-        binD=int(bin(D)[2:],2)
-	num=binB^(binC|~binD)
-	print'~D {}'.format(~D)
-	print'~D {}'.format(~D)
-	print'~D {}'.format(~D)
-#       num=bin(bin(B)^(bin(C)|~bin(D)))
+	num=B^(C|~D)
         return num
 
 def cyclicShift(C,s):
-	#C_rot=C<<s
-	#C_rot=C_rot%mask+C_rot/mask
-	#print '(C << s) {}'.format(hex(C << s))
-	#print '(C >> 32-s) {}'.format(hex(C >> 32-s))
-	C_rot=(C << s) | (C >> 32-s)
+	C_rot=C<<s
+	C_rot=C_rot%mask+C_rot/mask
 	return C_rot
 
 def little_end(string,base = 16):
