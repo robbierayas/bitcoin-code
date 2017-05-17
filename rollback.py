@@ -1,6 +1,7 @@
 import math
 import hashlib
 import utils
+import binascii
 
 ordermap={
 	0:7,
@@ -97,63 +98,52 @@ wordselect_right={
 }
 
 
+#target 5 word 160 bit buffer (ABCDE) to ()
+A0=int('67452301',16)
+B0=int('efcdab89',16)
+C0=int('98badcfe',16)
+D0=int('10325476',16)
+E0=int('c3d2e1f0',16)
+
 
 #overflow mask 2^32
 mask=4294967296;
 
-def myRipeMD160(public_key):
-        message=hashlib.sha256(public_key.decode('hex')).hexdigest()
-	bmessage=bin(int(message,16))[2:]
-	length=len(bmessage)
-	#pad messages so its length is 448 mod 512
-	numberOfZeros=int(511-((length+64)%512))
-        #append a 64 bit length value to message
-        blength=bin(length)[2:].zfill(64)
-	blength_little_end=''
-	for x in range(len(blength)/32):
-        	blength_little_end += little_end(blength[32*x:32*(x+1)],2)	
-	#append zeros and length
-	bmessage=bmessage.ljust(length+1,'1').ljust(448,'0')+blength_little_end[32:]+blength_little_end[:32]
-	print bmessage
-	hmessage=hex(int(bmessage,2))[2:-1]
-	#split message to 16 32-bit words for X[]
-	X=[little_end(hmessage[i:i+8]) for i in range(0, len(hmessage)-1, 8)]
-	#initialise 5 word 160 bit buffer (ABCDE) to ()
-	Ai=int('67452301',16)
-	Bi=int('efcdab89',16)
-	Ci=int('98badcfe',16)
-	Di=int('10325476',16)
-	Ei=int('c3d2e1f0',16)
-	A=Ai
-        B=Bi
-	C=Ci
-        D=Di
-	E=Ei
-	Ar=A
-	Br=B
-	Cr=C
-	Dr=D
-	Er=E
-	print 'h_initial {} {} {} {} {}'.format(hex(A),hex(B),hex(C),hex(D),hex(E))
-	#process message in 16_word (512 bit) chunks
-	##use 10 rounds of 16 bit ops on message block and buffer - in 2 parallel lines of 5
-	for round in range(0,5):
+def myRollBack(address):
+	print 'Rollback address {}'.format(address)
+	basedecode=utils.base58CheckDecode(address)
+	print 'Rollback basedecode {}'.format(basedecode)
+	hex_data=basedecode.encode('hex')
+	print 'Rollback hexl {}'.format(hex_data)
+	Af_hex=hex_data[:8]
+	Bf_hex=hex_data[8:16]
+	Cf_hex=hex_data[16:24]
+	Df_hex=hex_data[24:32]
+	Ef_hex=hex_data[32:40]
+	print 'hnew {} {} {} {} {}'.format(Af_hex,Bf_hex,Cf_hex,Df_hex,Ef_hex)
+	print 'TO DO un-add final values'
+	Al=int('99f6c5d9',16)
+	Bl=int('e109aea8',16)
+	Cl=int('00b8d1d1',16)
+	Dl=int('302cc6dc',16)
+	El=int('82a24ea5',16)
+	Ar=int('b2c952d9',16)
+	Br=int('a91d7fa6',16)
+	Cr=int('f083219c',16)
+	Dr=int('ac4b8c30',16)
+	Er=int('5592219f',16)
+	X = []
+	Xr = []
+	for round in range(4,3,-1):
+	#for round in range(4,-1,-1):
 		print 'round {}'.format(round)
-		for j in range(0,16):
-			#X
-			rho_j=rho.get(j,"nothing")
-			pi_j=(9*j+5)%16
-
-			#r=(rho_j^round)%16
-			#if round==0:
-			#	r=j
-			#rr=(pi_j*rho_j^round)%16
+		for j in range(15,14,-1):
+		#for j in range(15,-1,-1):
+			print 'j {}'.format(j)
+			
+			#r
 			r=wordselect_left.get(round*16+j,"nothing")
 			rr=wordselect_right.get(round*16+j,"nothing")
-
-			Xl=int(X[r],16)
-			Xr=int(X[rr],16)
-
 			#K
 			K=int(constantmap_left.get(round, "nothing"),16)
 	                Kr=int(constantmap_right.get(round, "nothing"),16)
@@ -161,63 +151,57 @@ def myRipeMD160(public_key):
 			#s
 			s=shiftmap_left.get(round*16+j,"nothing")
                         sr=shiftmap_right.get(round*16+j,"nothing")
-			if (round==4)&(j>14):
-				print 'round {} j {}, K {}, s {}, r {} rr {}'.format(round,j,K,s,r,rr)
-				print 'h_left {} {} {} {} {}'.format(hex(A),hex(B),hex(C),hex(D),hex(E))
-				print 'h_right {} {} {} {} {}'.format(hex(Ar),hex(Br),hex(Cr),hex(Dr),hex(Er))
-				print 'X  {}'.format(hex(Xl))
+			
+			print 'round {} j {}, K {}, s {}, r {} rr {}'.format(round,j,K,s,r,rr)
+			print 'h_left {} {} {} {} {}'.format(hex(Al),hex(Bl),hex(Cl),hex(Dl),hex(El))
+			print 'h_right {} {} {} {} {}'.format(hex(Ar),hex(Br),hex(Cr),hex(Dr),hex(Er))
 			#left
 			#print 'left'
-			A,B,C,D,E=compression(A,B,C,D,E,functionmap_left.get(round, "nothing"),Xl,K,s)
+			Al,Bl,Cl,Dl,El,Xl=dcompression(Al,Bl,Cl,Dl,El,functionmap_left.get(round, "nothing"),K,s)
 			#print ''
                         #right
 			#print 'right'
-                        Ar,Br,Cr,Dr,Er=compression(Ar,Br,Cr,Dr,Er,functionmap_right.get(round, "nothing"),Xr,Kr,sr)
+                        Ar,Br,Cr,Dr,Er,Xr=dcompression(Ar,Br,Cr,Dr,Er,functionmap_right.get(round, "nothing"),Kr,sr)
 
-	##add output to message to form new buffer value
-	#convert h0, h1, h2, h3 and h4 in hex, then add, little endian
-	Af=(Bi+C+Dr)%mask
-	Bf=(Ci+D+Er)%mask
-	Cf=(Di+E+Ar)%mask
-	Df=(Ei+A+Br)%mask
-	Ef=(Ai+B+Cr)%mask
-	Af_hex=hex(Af)[2:].zfill(8)
-	Bf_hex=hex(Bf)[2:].zfill(8)
-	Cf_hex=hex(Cf)[2:].zfill(8)
-	Df_hex=hex(Df)[2:].zfill(8)
-	Ef_hex=hex(Ef)[2:].zfill(8)
-	print 'hnew {} {} {} {} {}'.format(little_end(Af_hex),little_end(Bf_hex),little_end(Cf_hex),little_end(Df_hex),little_end(Ef_hex))
-	hex_data=(little_end(Af_hex))+(little_end(Bf_hex))+(little_end(Cf_hex))+(little_end(Df_hex))+little_end(Ef_hex)
-	print 'hex_data {}'.format(hex_data)
-	hex_string=hex(int(hex_data, 16))[2:-1]
+			#Save X value
+			X[r]=int(Xl,16)
+			X[rr]=int(Xr,16)
 
-	print 'hex_string {}'.format(hex_string)
-	hex_string=hex_string.decode('hex')
-	#output hash value is the final buffer value
-	return hex_string
 
-def compression(A,B,C,D,E,f,X,K,s):
-	#print 'compression {}'.format(A)
-	A_out,C_out=operation(A,B,C,D,E,f,X,K,s)
+
+def dcompression(A,B,C,D,E,f,K,s):
+	D=E
+	B=C
+	E=A
+
+
+
+
+
+
+
+
+	print 'compression {}'.format(A)
+	A_out,C_out=doperation(A,B,C,D,E,f,X,K,s)
         A=E%mask
         C=B%mask
         E=D%mask
         B=A_out
         D=C_out
-	return A,B,C,D,E
+	return A,B,C,D,E,X
 
-def operation(A,B,C,D,E,f,X,K,s):
+def doperation(A,B,C,D,E,f,X,K,s):
 	A_out=A
 	if f==1:
-		A_out=(A_out+function1(B,C,D))%mask
+		A_out=(A_out+dfunction1(B,C,D))%mask
 	elif f==2:
-                A_out=(A_out+function2(B,C,D))%mask
+                A_out=(A_out+dfunction2(B,C,D))%mask
         elif f==3:
-                A_out=(A_out+function3(B,C,D))%mask
+                A_out=(A_out+dfunction3(B,C,D))%mask
         elif f==4:
-                A_out=(A_out+function4(B,C,D))%mask
+                A_out=(A_out+dfunction4(B,C,D))%mask
         elif f==5:
-                A_out=(A_out+function5(B,C,D))%mask
+                A_out=(A_out+dfunction5(B,C,D))%mask
 	A_out000=(A_out+X)%mask
 	A_out00=(A_out000+K)%mask
 	A_out0=cyclicShift(A_out00,s)%mask
@@ -225,10 +209,7 @@ def operation(A,B,C,D,E,f,X,K,s):
 	C_out=cyclicShift(C,10)%mask
 	return A_out1%mask,C_out%mask
 
-def ordering(i):
-	return ordermap.get(i, "nothing")
-
-def function1(B,C,D):
+def dfunction1(B,C,D):
 	binB=int(bin(B)[2:],2)
 	
         binC=int(bin(C)[2:],2)
@@ -238,7 +219,7 @@ def function1(B,C,D):
         num=binB^binC^binD
 	return num
 
-def function2(B,C,D):
+def dfunction2(B,C,D):
         binB=int(bin(B)[2:],2)
 
         binC=int(bin(C)[2:],2)
@@ -247,7 +228,7 @@ def function2(B,C,D):
         num=(binB&binC)|(~binB&binD)
         return num
 
-def function3(B,C,D):
+def dfunction3(B,C,D):
         binB=int(bin(B)[2:],2)
         binC=int(bin(C)[2:],2)
         binD=int(bin(D)[2:],2)
@@ -255,7 +236,7 @@ def function3(B,C,D):
         return num
 
 
-def function4(B,C,D):
+def dfunction4(B,C,D):
         binB=int(bin(B)[2:],2)
 
         binC=int(bin(C)[2:],2)
@@ -265,7 +246,7 @@ def function4(B,C,D):
         return num
 
 
-def function5(B,C,D):
+def dfunction5(B,C,D):
         binB=int(bin(B)[2:],2)
 
         binC=int(bin(C)[2:],2)
@@ -274,8 +255,13 @@ def function5(B,C,D):
 	num=binB^(binC|~binD)
         return num
 
-def cyclicShift(C,s):
+
+def ROL(C,s):
 	C_rot=(C << s) | (C >> 32-s)
+	return C_rot
+
+def ROR(C,s):
+	C_rot=(C >> s) | (C << 32-s)
 	return C_rot
 
 def little_end(string,base = 16):
