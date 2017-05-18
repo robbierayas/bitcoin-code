@@ -223,14 +223,14 @@ def operation(A,B,C,D,E,f,X,K,s):
 	A_out00=(A_out000+K)%mask
 	A_out0=cyclicShift(A_out00,s)%mask
 	A_out1=(A_out0+E)%mask
-	#if K==2840853838:
-		#print 'f {} {} {} {} {}'.format(f,B,C,D,hex(function5(B,C,D)%mask))
-		#print 'A {}'.format(hex(A))
-		#print 'A_out4 {}'.format(hex((A+function5(B,C,D))%mask))
-		#print 'A_out3 {}'.format(hex(A_out000))
-		#print 'A_out2 {}'.format(hex(A_out00))
-		#print 'A_out1 {}'.format(hex(A_out0))
-		#print 'A_out {}'.format(hex(A_out1))
+	if K==2840853838:
+		print 'f {} {} {} {} {}'.format(f,B,C,D,hex(function5(B,C,D)%mask))
+		print 'A {}'.format(hex(A))
+		print 'A_out4 {}'.format(hex((A+function5(B,C,D))%mask))
+		print 'A_out3 {}'.format(hex(A_out000))
+		print 'A_out2 {}'.format(hex(A_out00))
+		print 'A_out1 {}'.format(hex(A_out0))
+		print 'A_out {}'.format(hex(A_out1))
 
 	C_out=cyclicShift(C,10)%mask
 	return A_out1%mask,C_out%mask
