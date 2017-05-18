@@ -122,22 +122,28 @@ def myRollBack(address):
 	Ef_hex=hex_data[32:40]
 	print 'hnew {} {} {} {} {}'.format(Af_hex,Bf_hex,Cf_hex,Df_hex,Ef_hex)
 	print 'TO DO un-add final values'
-	Al=int('99f6c5d9',16)
-	Bl=int('e109aea8',16)
-	Cl=int('00b8d1d1',16)
-	Dl=int('302cc6dc',16)
-	El=int('82a24ea5',16)
-	Ar=int('b2c952d9',16)
-	Br=int('a91d7fa6',16)
-	Cr=int('f083219c',16)
-	Dr=int('ac4b8c30',16)
-	Er=int('5592219f',16)
-	X = []
-	Xr = []
+	Al=int('82a24ea5',16)
+	Bl=int('11e8ef41',16)
+	Cl=int('e109aea8',16)
+	Dl=int('e3474402',16)
+	El=int('302cc6dc',16)
+
+	Ar=int('5592219f',16)
+	Br=int('4eb93ee3',16)
+	Cr=int('a91d7fa6',16)
+	Dr=int('0c8673c2',16)
+	Er=int('ac4b8c30',16)
+	print ''
+	print 'h_left 15 {} {} {} {} {}'.format(hex(Al),hex(Bl),hex(Cl),hex(Dl),hex(El))
+	print 'h_right 15 {} {} {} {} {}'.format(hex(Ar),hex(Br),hex(Cr),hex(Dr),hex(Er))
+	print ''
+	X=['' for i in range(8)]+[int('00000080',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000100',16), int('00000000',16)]
+	#X[6]=int('9fd3a02e',16)
+	Xrr=['' for i in range(8)]+[int('00000080',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000100',16), int('00000000',16)]
 	for round in range(4,3,-1):
 	#for round in range(4,-1,-1):
 		print 'round {}'.format(round)
-		for j in range(15,14,-1):
+		for j in range(15,11,-1):
 		#for j in range(15,-1,-1):
 			print 'j {}'.format(j)
 			
@@ -151,63 +157,119 @@ def myRollBack(address):
 			#s
 			s=shiftmap_left.get(round*16+j,"nothing")
                         sr=shiftmap_right.get(round*16+j,"nothing")
-			
-			print 'round {} j {}, K {}, s {}, r {} rr {}'.format(round,j,K,s,r,rr)
-			print 'h_left {} {} {} {} {}'.format(hex(Al),hex(Bl),hex(Cl),hex(Dl),hex(El))
-			print 'h_right {} {} {} {} {}'.format(hex(Ar),hex(Br),hex(Cr),hex(Dr),hex(Er))
+
+
 			#left
 			#print 'left'
-			Al,Bl,Cl,Dl,El,Xl=dcompression(Al,Bl,Cl,Dl,El,functionmap_left.get(round, "nothing"),K,s)
+			#Al,Bl,Cl,Dl,El,Xl=dcompression(Al,Bl,Cl,Dl,El,functionmap_left.get(round, "nothing"),X[r],K,s)
+			Al,Bl,Cl,Dl,El,Xl=rcompression(Al,Bl,Cl,Dl,El,functionmap_left.get(round, "nothing"),X,r,K,s)
 			#print ''
                         #right
 			#print 'right'
-                        Ar,Br,Cr,Dr,Er,Xr=dcompression(Ar,Br,Cr,Dr,Er,functionmap_right.get(round, "nothing"),Kr,sr)
-
+                        Ar,Br,Cr,Dr,Er,Xr=dcompression(Ar,Br,Cr,Dr,Er,functionmap_right.get(round, "nothing"),Xrr[rr],Kr,sr)
+			print ''
+			print 'round {} j {}, K {}, s {}, r {} rr {}'.format(round,j,K,s,r,rr)
+			print 'h_left {} {} {} {} {} {}'.format(j-1,hex(Al),hex(Bl),hex(Cl),hex(Dl),hex(El))
+			print 'h_right {} {} {} {} {} {}'.format(j-1,hex(Ar),hex(Br),hex(Cr),hex(Dr),hex(Er))
 			#Save X value
-			X[r]=int(Xl,16)
-			X[rr]=int(Xr,16)
+			X[r]=Xl
+			Xrr[rr]=Xr
 
+def rcompression(A,B,C,D,E,f,X,r,K,s):
+	X_out=X[r]
+	#terminate recursion
+	if X[r]!='':
+		print 'X defined skip recursion'
+		A_out,C_out,X_out=doperation(A,B,C,D,E,f,X[r],K,s)
+		if X[r]!=X_out:
+			print 'Xr!=Xout {} {}'.format(X[r],X_out)
+		D=E
+		B=C
+		E=A
 
+		A=A_out
+		C=C_out
+	else:
+		print 'X undefined recurse'
+		A_out,C_out,X_out=roperation(A,B,C,D,E,f,X,r,K,s)
 
-def dcompression(A,B,C,D,E,f,K,s):
+	#print 'compression {}'.format(B)
+
+	return A,B,C,D,E,X_out
+
+def dcompression(A,B,C,D,E,f,X,K,s):
+	#start
+	A_out,C_out,X_out=doperation(A,B,C,D,E,f,X,K,s)
 	D=E
 	B=C
 	E=A
 
+	A=A_out
+	C=C_out
+	#print 'compression {}'.format(B)
+
+	return A,B,C,D,E,X_out
+
+def roperation(A,B,C,D,E,f,X,r,K,s):
+	print 'roperation'
+	C_out=ROR(D,10)%mask
+	print 'f {}'.format(hex(f))
+	A_out=B
+	print 'A_out {}'.format(hex(A_out))
+	A_out1=(A_out-A)%mask
+	print 'A_out1 {}'.format(hex(A_out1))
+	A_out2=ROR(A_out1,s)%mask
+	print 'A_out2 {}'.format(hex(A_out2))
+	A_out3=(A_out2-K)%mask
+	print 'A_out3 {}'.format(hex(A_out3))
+
+	Al,Bl,Cl,Dl,El,Xl=rcompression(Al,Bl,Cl,Dl,El,functionmap_left.get(round, "nothing"),X,r,K,s)
+
+	A_out4=(A_out3)%mask
 
 
+	print 'A_out4 {}'.format(hex(A_out4))
+	print 'dfunction5 {} {} {} {}'.format(C,C_out,E,hex(dfunction5(C,C_out,E)%mask))
+	if f==1:
+		A_out4=(A_out4-dfunction1(C,C_out,E))%mask
+	elif f==2:
+                A_out4=(A_out4-dfunction2(C,C_out,E))%mask
+        elif f==3:
+                A_out4=(A_out4-dfunction3(C,C_out,E))%mask
+        elif f==4:
+                A_out4=(A_out4-dfunction4(C,C_out,E))%mask
+        elif f==5:
+                A_out4=(A_out4-dfunction5(C,C_out,E))%mask
+	print 'A_out4 {}'.format(hex(A_out4))
+	return A_out4%mask,C_out%mask,X[r]
 
-
-
-
-
-	print 'compression {}'.format(A)
-	A_out,C_out=doperation(A,B,C,D,E,f,X,K,s)
-        A=E%mask
-        C=B%mask
-        E=D%mask
-        B=A_out
-        D=C_out
-	return A,B,C,D,E,X
 
 def doperation(A,B,C,D,E,f,X,K,s):
-	A_out=A
+	C_out=ROR(D,10)%mask
+	#print 'f {}'.format(hex(f))
+	A_out=B
+	#print 'A_out {}'.format(hex(A_out))
+	A_out1=(A_out-A)%mask
+	#print 'A_out1 {}'.format(hex(A_out1))
+	A_out2=ROR(A_out1,s)%mask
+	#print 'A_out2 {}'.format(hex(A_out2))
+	A_out3=(A_out2-K)%mask
+	#print 'A_out3 {}'.format(hex(A_out3))
+	A_out4=(A_out3-X)%mask
+	#print 'A_out4 {}'.format(hex(A_out4))
+	#print 'dfunction5 {} {} {} {}'.format(C,C_out,E,hex(dfunction5(C,C_out,E)%mask))
 	if f==1:
-		A_out=(A_out+dfunction1(B,C,D))%mask
+		A_out4=(A_out4-dfunction1(C,C_out,E))%mask
 	elif f==2:
-                A_out=(A_out+dfunction2(B,C,D))%mask
+                A_out4=(A_out4-dfunction2(C,C_out,E))%mask
         elif f==3:
-                A_out=(A_out+dfunction3(B,C,D))%mask
+                A_out4=(A_out4-dfunction3(C,C_out,E))%mask
         elif f==4:
-                A_out=(A_out+dfunction4(B,C,D))%mask
+                A_out4=(A_out4-dfunction4(C,C_out,E))%mask
         elif f==5:
-                A_out=(A_out+dfunction5(B,C,D))%mask
-	A_out000=(A_out+X)%mask
-	A_out00=(A_out000+K)%mask
-	A_out0=cyclicShift(A_out00,s)%mask
-	A_out1=(A_out0+E)%mask
-	C_out=cyclicShift(C,10)%mask
-	return A_out1%mask,C_out%mask
+                A_out4=(A_out4-dfunction5(C,C_out,E))%mask
+	#print 'A_out4 {}'.format(hex(A_out4))
+	return A_out4%mask,C_out%mask,X
 
 def dfunction1(B,C,D):
 	binB=int(bin(B)[2:],2)

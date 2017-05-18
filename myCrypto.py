@@ -99,25 +99,24 @@ wordselect_right={
 
 
 #overflow mask 2^32
-mask=4294967296;
-
+mask=4294967296
+roundnum=0
 def myRipeMD160(public_key):
         message=hashlib.sha256(public_key.decode('hex')).hexdigest()
 	bmessage=bin(int(message,16))[2:]
+	#append one and zeros 
 	length=len(bmessage)
-	#pad messages so its length is 448 mod 512
-	numberOfZeros=int(511-((length+64)%512))
+	bmessage=bmessage.ljust(length+1,'1').ljust(448,'0')
         #append a 64 bit length value to message
         blength=bin(length)[2:].zfill(64)
 	blength_little_end=''
 	for x in range(len(blength)/32):
-        	blength_little_end += little_end(blength[32*x:32*(x+1)],2)	
-	#append zeros and length
-	bmessage=bmessage.ljust(length+1,'1').ljust(448,'0')+blength_little_end[32:]+blength_little_end[:32]
-	print bmessage
+        	blength_little_end += little_end(blength[32*x:32*(x+1)],2)
+	bmessage+=blength_little_end[32:]+blength_little_end[:32]
 	hmessage=hex(int(bmessage,2))[2:-1]
 	#split message to 16 32-bit words for X[]
 	X=[little_end(hmessage[i:i+8]) for i in range(0, len(hmessage)-1, 8)]
+	print 'X {}'.format(X)
 	#initialise 5 word 160 bit buffer (ABCDE) to ()
 	Ai=int('67452301',16)
 	Bi=int('efcdab89',16)
@@ -138,7 +137,8 @@ def myRipeMD160(public_key):
 	#process message in 16_word (512 bit) chunks
 	##use 10 rounds of 16 bit ops on message block and buffer - in 2 parallel lines of 5
 	for round in range(0,5):
-		print 'round {}'.format(round)
+		roundnum=round
+		#print 'roundnum {}'.format(roundnum)
 		for j in range(0,16):
 			#X
 			rho_j=rho.get(j,"nothing")
@@ -161,11 +161,7 @@ def myRipeMD160(public_key):
 			#s
 			s=shiftmap_left.get(round*16+j,"nothing")
                         sr=shiftmap_right.get(round*16+j,"nothing")
-			if (round==4)&(j>14):
-				print 'round {} j {}, K {}, s {}, r {} rr {}'.format(round,j,K,s,r,rr)
-				print 'h_left {} {} {} {} {}'.format(hex(A),hex(B),hex(C),hex(D),hex(E))
-				print 'h_right {} {} {} {} {}'.format(hex(Ar),hex(Br),hex(Cr),hex(Dr),hex(Er))
-				print 'X  {}'.format(hex(Xl))
+			
 			#left
 			#print 'left'
 			A,B,C,D,E=compression(A,B,C,D,E,functionmap_left.get(round, "nothing"),Xl,K,s)
@@ -173,6 +169,11 @@ def myRipeMD160(public_key):
                         #right
 			#print 'right'
                         Ar,Br,Cr,Dr,Er=compression(Ar,Br,Cr,Dr,Er,functionmap_right.get(round, "nothing"),Xr,Kr,sr)
+			if (round==4)&(j>=11):
+				print 'round {} j {}, K {}, s {}, r {} rr {} Xl {}'.format(round,j,K,s,r,rr,Xl)
+				print 'h_left {} {} {} {} {}'.format(hex(A),hex(B),hex(C),hex(D),hex(E))
+				print 'h_right {} {} {} {} {}'.format(hex(Ar),hex(Br),hex(Cr),hex(Dr),hex(Er))
+				print ''
 
 	##add output to message to form new buffer value
 	#convert h0, h1, h2, h3 and h4 in hex, then add, little endian
@@ -222,6 +223,15 @@ def operation(A,B,C,D,E,f,X,K,s):
 	A_out00=(A_out000+K)%mask
 	A_out0=cyclicShift(A_out00,s)%mask
 	A_out1=(A_out0+E)%mask
+	#if K==2840853838:
+		#print 'f {} {} {} {} {}'.format(f,B,C,D,hex(function5(B,C,D)%mask))
+		#print 'A {}'.format(hex(A))
+		#print 'A_out4 {}'.format(hex((A+function5(B,C,D))%mask))
+		#print 'A_out3 {}'.format(hex(A_out000))
+		#print 'A_out2 {}'.format(hex(A_out00))
+		#print 'A_out1 {}'.format(hex(A_out0))
+		#print 'A_out {}'.format(hex(A_out1))
+
 	C_out=cyclicShift(C,10)%mask
 	return A_out1%mask,C_out%mask
 
