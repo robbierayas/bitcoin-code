@@ -1,4 +1,6 @@
 #creates address
+from datetime import datetime
+startTime = datetime.now()
 import myWallet
 import myCrypto
 from rollback import myRollBack
@@ -20,8 +22,8 @@ print ''
 print ''
 print ''
 print 'C library'
-from Crypto.Hash import RIPEMD160
-hash = RIPEMD160.new()
+from Crypto.Hash import RIPEMD
+hash = RIPEMD.new()
 pkHashStep00=hashlib.sha256(public_key.decode('hex')).digest()
 hash.update(pkHashStep00)
 cdigest=hash.digest()
@@ -62,3 +64,4 @@ print 'Rollback'
 myRollBack(pkHashStep31)
 
 
+print datetime.now() - startTime
