@@ -123,3 +123,37 @@ class TestRawTransactions:
         "01605af405000000001976a914097072524438d003d23a2f23edb65aae1bb3e46988ac"
         "0000000001000000"
     )
+
+
+# ============================================================================
+# TEST HD WALLET DATA (BIP32/BIP39)
+# ============================================================================
+
+class TestHDWallet:
+    """Test mnemonic and HD wallet data."""
+
+    # Test mnemonic (12 words) - DO NOT USE FOR REAL FUNDS
+    # Generated for testing purposes only
+    MNEMONIC_12 = "witch collapse practice feed shame open despair creek road again ice least"
+
+    # Test mnemonic (24 words) - DO NOT USE FOR REAL FUNDS
+    MNEMONIC_24 = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"
+
+    # Expected addresses for MNEMONIC_12 at various derivation paths
+    # m/44'/0'/0'/0/0 (first receiving address)
+    EXPECTED_ADDR_0_0 = "178cS83u7tTsaaBVH71f2CpeZcmxkcm4dA"
+    # m/44'/0'/0'/0/1 (second receiving address)
+    EXPECTED_ADDR_0_1 = "19gM97KgfVjHzJJ8s26BuccMH2pDmDWAUE"
+    # m/44'/0'/0'/1/0 (first change address)
+    EXPECTED_ADDR_1_0 = "13KoAcTenoXWHkMPsuWMDJcYKPj41rPQxi"
+
+    # Default derivation path for Bitcoin (BIP44)
+    DEFAULT_PATH = "m/44'/0'/0'/0/0"
+
+    # Account paths
+    ACCOUNT_0 = "m/44'/0'/0'"
+    ACCOUNT_1 = "m/44'/0'/1'"
+
+    # Chain types
+    EXTERNAL_CHAIN = 0  # Receiving addresses
+    INTERNAL_CHAIN = 1  # Change addresses

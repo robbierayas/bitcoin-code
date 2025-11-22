@@ -261,13 +261,3 @@ def RIPEMD160(data):
               little_end(makehex(h4)))
 
     return result
-
-
-# ============================================================================
-# TESTING
-# ============================================================================
-#
-# Run tests with:
-#   cd cryptography/tests
-#   python test_ripemd160.py
-#

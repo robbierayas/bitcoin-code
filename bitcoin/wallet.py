@@ -9,15 +9,24 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from cryptography.keypair import KeyPair
-from config import TestKeys
+from cryptography import bip32
+from config import TestKeys, TestHDWallet
+from bitcoin import blockchair
 
 
 class Wallet:
     """
     Bitcoin wallet for managing keys and transactions.
 
+    Supports both single-key and HD (hierarchical deterministic) wallets.
+
     Attributes:
         keypair (KeyPair): The ECDSA key pair for this wallet
+        is_hd (bool): True if this is an HD wallet
+        master_node (BIP32Node): Master node for HD wallet (None for single-key)
+        account_index (int): BIP44 account index (default: 0)
+        external_index (int): Current external (receiving) address index
+        internal_index (int): Current internal (change) address index
     """
 
     def __init__(self, privatekeyhex=None):
@@ -33,6 +42,17 @@ class Wallet:
 
         # Create keypair instance variable
         self.keypair = KeyPair(privatekeyhex)
+
+        # HD wallet properties (None for single-key wallets)
+        self.is_hd = False
+        self.master_node = None
+        self.account_index = 0
+        self.external_index = 0  # Receiving addresses
+        self.internal_index = 0  # Change addresses
+
+        # Cache of generated addresses -> derivation paths
+        # This lets us find the right key for any address we've generated
+        self._address_cache = {}  # {address: (chain, index)}
 
     def get_address(self):
         """
@@ -124,6 +144,367 @@ class Wallet:
         """
         keypair = KeyPair.generate()
         return cls(keypair.get_private_key())
+
+    @classmethod
+    def from_mnemonic(cls, mnemonic=None, passphrase="", account=0):
+        """
+        Create HD Wallet from BIP39 mnemonic seed phrase.
+
+        Args:
+            mnemonic (str, optional): BIP39 mnemonic (defaults to test mnemonic)
+            passphrase (str): Optional passphrase for additional security
+            account (int): BIP44 account index (default: 0)
+
+        Returns:
+            Wallet: New HD Wallet instance
+
+        Example:
+            >>> wallet = Wallet.from_mnemonic()  # Uses test mnemonic
+            >>> wallet = Wallet.from_mnemonic("witch collapse practice...")
+            >>> wallet.is_hd
+            True
+        """
+        if mnemonic is None:
+            mnemonic = TestHDWallet.MNEMONIC_12
+
+        # Convert mnemonic to seed
+        seed = bip32.mnemonic_to_seed(mnemonic, passphrase)
+
+        # Generate master key
+        master_node = bip32.master_key_from_seed(seed)
+
+        # Get first receiving address (m/44'/0'/0'/0/0)
+        first_node = bip32.derive_from_path(master_node, f"m/44'/0'/{account}'/0/0")
+
+        # Create wallet with first address private key
+        wallet = cls(first_node.get_private_key_hex())
+
+        # Store HD wallet state
+        wallet.is_hd = True
+        wallet.master_node = master_node
+        wallet.account_index = account
+        wallet.external_index = 0
+        wallet.internal_index = 0
+
+        # Cache first address (external chain, index 0)
+        first_address = first_node.get_address()
+        wallet._address_cache[first_address] = (0, 0)  # (chain, index)
+
+        return wallet
+
+    def get_change_address(self):
+        """
+        Get next change address for HD wallet.
+
+        For single-key wallets, returns the same address.
+        For HD wallets, derives next address on internal chain.
+
+        Returns:
+            str: Bitcoin change address
+
+        Example:
+            >>> wallet = Wallet.from_mnemonic()
+            >>> change_addr = wallet.get_change_address()
+        """
+        if not self.is_hd:
+            # Single-key wallet - use same address for change
+            return self.get_address()
+
+        # HD wallet - derive change address from internal chain
+        # Path: m/44'/0'/account'/1/internal_index
+        path = f"m/44'/0'/{self.account_index}'/1/{self.internal_index}"
+        node = bip32.derive_from_path(self.master_node, path)
+
+        change_address = node.get_address()
+
+        # Cache this address (internal chain = 1, current index)
+        self._address_cache[change_address] = (1, self.internal_index)
+
+        # Increment internal index for next time
+        self.internal_index += 1
+
+        return change_address
+
+    def get_new_receiving_address(self):
+        """
+        Get next receiving address for HD wallet.
+
+        For single-key wallets, returns the same address.
+        For HD wallets, derives next address on external chain.
+
+        Returns:
+            str: Bitcoin receiving address
+
+        Example:
+            >>> wallet = Wallet.from_mnemonic()
+            >>> addr1 = wallet.get_new_receiving_address()
+            >>> addr2 = wallet.get_new_receiving_address()
+            >>> addr1 != addr2  # True for HD wallets
+        """
+        if not self.is_hd:
+            # Single-key wallet - always same address
+            return self.get_address()
+
+        # HD wallet - derive new receiving address from external chain
+        # Path: m/44'/0'/account'/0/external_index
+        path = f"m/44'/0'/{self.account_index}'/0/{self.external_index}"
+        node = bip32.derive_from_path(self.master_node, path)
+
+        receiving_address = node.get_address()
+
+        # Cache this address (external chain = 0, current index)
+        self._address_cache[receiving_address] = (0, self.external_index)
+
+        # Increment external index
+        self.external_index += 1
+
+        return receiving_address
+
+    def get_private_key_for_address(self, address, auto_discover=True, search_limit=100):
+        """
+        Get private key for a specific address.
+
+        For HD wallets, looks up the address in the cache and derives the key.
+        If not cached and auto_discover=True, scans ahead to find the address.
+        For single-key wallets, returns the wallet's private key if address matches.
+
+        Args:
+            address (str): Bitcoin address to get private key for
+            auto_discover (bool): Automatically search for uncached addresses (default: True)
+            search_limit (int): Maximum addresses to scan per chain if auto_discover=True (default: 100)
+
+        Returns:
+            str: Private key hex (64 characters)
+
+        Raises:
+            ValueError: If address not found or not generated by this wallet
+
+        Example:
+            >>> wallet = Wallet.from_mnemonic()
+            >>> addr = wallet.get_new_receiving_address()
+            >>> key = wallet.get_private_key_for_address(addr)
+        """
+        # Single-key wallet
+        if not self.is_hd:
+            if address == self.get_address():
+                return self.get_private_key()
+            else:
+                raise ValueError(f"Address {address} does not belong to this wallet")
+
+        # HD wallet - check cache first
+        if address in self._address_cache:
+            chain, index = self._address_cache[address]
+            path = f"m/44'/0'/{self.account_index}'/{chain}/{index}"
+            node = bip32.derive_from_path(self.master_node, path)
+            return node.get_private_key_hex()
+
+        # If auto_discover is enabled, search for the address
+        if auto_discover:
+            # Search external chain (receiving addresses)
+            for index in range(search_limit):
+                path = f"m/44'/0'/{self.account_index}'/0/{index}"
+                node = bip32.derive_from_path(self.master_node, path)
+                addr = node.get_address()
+
+                # Cache this address
+                self._address_cache[addr] = (0, index)
+
+                if addr == address:
+                    # Found it! Update external index if needed
+                    if index >= self.external_index:
+                        self.external_index = index + 1
+                    return node.get_private_key_hex()
+
+            # Search internal chain (change addresses)
+            for index in range(search_limit):
+                path = f"m/44'/0'/{self.account_index}'/1/{index}"
+                node = bip32.derive_from_path(self.master_node, path)
+                addr = node.get_address()
+
+                # Cache this address
+                self._address_cache[addr] = (1, index)
+
+                if addr == address:
+                    # Found it! Update internal index if needed
+                    if index >= self.internal_index:
+                        self.internal_index = index + 1
+                    return node.get_private_key_hex()
+
+        # Address not found after search
+        raise ValueError(
+            f"Address {address} not found in first {search_limit} addresses of each chain. "
+            f"It may not belong to this wallet, or you can increase search_limit parameter."
+        )
+
+    def discover_addresses(self, gap_limit=20):
+        """
+        Discover addresses with UTXOs by scanning ahead (BIP44 gap limit).
+
+        Checks addresses in sequence until finding gap_limit consecutive empty addresses.
+        Caches all discovered addresses.
+
+        Args:
+            gap_limit (int): Number of consecutive empty addresses before stopping (default: 20)
+
+        Returns:
+            dict: Summary of discovery {
+                'external': number of external addresses found,
+                'internal': number of internal addresses found,
+                'total_balance': total balance in satoshis
+            }
+
+        Example:
+            >>> wallet = Wallet.from_mnemonic()
+            >>> summary = wallet.discover_addresses()
+            >>> print(f"Found {summary['external']} receiving addresses")
+        """
+        if not self.is_hd:
+            return {'external': 1, 'internal': 0, 'total_balance': 0}
+
+        print("Discovering addresses (this may take a moment)...")
+
+        external_found = 0
+        internal_found = 0
+        total_balance = 0
+
+        # Discover external chain (receiving addresses)
+        gap_count = 0
+        index = 0
+
+        while gap_count < gap_limit:
+            path = f"m/44'/0'/{self.account_index}'/0/{index}"
+            node = bip32.derive_from_path(self.master_node, path)
+            addr = node.get_address()
+
+            # Cache this address
+            self._address_cache[addr] = (0, index)
+
+            # Check if address has any activity
+            try:
+                balance = blockchair.get_address_balance(addr)
+                if balance['total'] > 0:
+                    external_found += 1
+                    total_balance += balance['total']
+                    gap_count = 0  # Reset gap counter
+                    print(f"  Found address {index}: {addr} ({balance['total']} sats)")
+                else:
+                    gap_count += 1
+            except blockchair.BlockchairError:
+                # API error, assume empty
+                gap_count += 1
+
+            index += 1
+
+            # Safety limit
+            if index > 1000:
+                print("  Reached safety limit of 1000 addresses")
+                break
+
+        # Update external index to continue from where we left off
+        self.external_index = index
+
+        # Discover internal chain (change addresses)
+        gap_count = 0
+        index = 0
+
+        while gap_count < gap_limit:
+            path = f"m/44'/0'/{self.account_index}'/1/{index}"
+            node = bip32.derive_from_path(self.master_node, path)
+            addr = node.get_address()
+
+            # Cache this address
+            self._address_cache[addr] = (1, index)
+
+            # Check if address has any activity
+            try:
+                balance = blockchair.get_address_balance(addr)
+                if balance['total'] > 0:
+                    internal_found += 1
+                    total_balance += balance['total']
+                    gap_count = 0
+                    print(f"  Found change address {index}: {addr} ({balance['total']} sats)")
+                else:
+                    gap_count += 1
+            except blockchair.BlockchairError:
+                gap_count += 1
+
+            index += 1
+
+            if index > 1000:
+                print("  Reached safety limit of 1000 change addresses")
+                break
+
+        # Update internal index
+        self.internal_index = index
+
+        print(f"Discovery complete: {external_found} receiving, {internal_found} change addresses")
+
+        return {
+            'external': external_found,
+            'internal': internal_found,
+            'total_balance': total_balance
+        }
+
+    def find_utxos(self, min_confirmations=1):
+        """
+        Find unspent transaction outputs for this wallet's address.
+
+        Uses Blockchair API to find UTXOs.
+
+        Args:
+            min_confirmations (int): Minimum confirmations required
+
+        Returns:
+            list: List of UTXO dictionaries (see blockchair.find_utxos())
+
+        Raises:
+            blockchair.BlockchairError: If API request fails
+
+        Example:
+            >>> wallet = Wallet()
+            >>> utxos = wallet.find_utxos()
+            >>> for utxo in utxos:
+            ...     print(f"{utxo['txid']}:{utxo['vout']} = {utxo['value']} sats")
+        """
+        address = self.get_address()
+        return blockchair.find_utxos(address, min_confirmations)
+
+    def find_funding_utxo(self, min_amount=546, min_confirmations=1):
+        """
+        Find a suitable UTXO to fund a transaction.
+
+        Args:
+            min_amount (int): Minimum amount in satoshis (default: 546 dust limit)
+            min_confirmations (int): Minimum confirmations
+
+        Returns:
+            dict or None: Best UTXO, or None if none found
+
+        Example:
+            >>> wallet = Wallet()
+            >>> utxo = wallet.find_funding_utxo(min_amount=100000)
+            >>> if utxo:
+            ...     print(f"Can spend {utxo['value']} sats")
+        """
+        address = self.get_address()
+        return blockchair.find_funding_utxo(address, min_amount, min_confirmations)
+
+    def get_balance(self):
+        """
+        Get balance for this wallet's address.
+
+        Uses Blockchair API.
+
+        Returns:
+            dict: Balance information (see blockchair.get_address_balance())
+
+        Example:
+            >>> wallet = Wallet()
+            >>> balance = wallet.get_balance()
+            >>> print(f"Balance: {balance['total']:,} satoshis")
+        """
+        address = self.get_address()
+        return blockchair.get_address_balance(address)
 
     def __repr__(self):
         """String representation (doesn't expose private key)."""

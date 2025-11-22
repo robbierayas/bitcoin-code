@@ -53,20 +53,40 @@ class KeyPair:
         """
         Generate public key from private key using ECDSA secp256k1.
 
+        Uses both standard ecdsa library and custom ecdsaRR implementation,
+        then verifies they produce identical results.
+
         Returns:
             str: Hex-encoded uncompressed public key (130 characters)
         """
-        # Create signing key from private key
-        sk = ecdsa.SigningKey.from_string(
+        # Method 1: Standard ecdsa library
+        sk_standard = ecdsa.SigningKey.from_string(
             bytes.fromhex(self._privatekey),
             curve=ecdsa.SECP256k1
         )
+        vk_standard = sk_standard.get_verifying_key()
+        pubkey_standard = '04' + vk_standard.to_string().hex()
 
-        # Get verifying (public) key
-        vk = sk.get_verifying_key()
+        # Method 2: Custom ecdsaRR implementation
+        from cryptography import ecdsaRR
 
-        # Return uncompressed public key (04 + x + y)
-        return '04' + vk.to_string().hex()
+        sk_custom = ecdsaRR.SigningKey.from_string(
+            bytes.fromhex(self._privatekey),
+            curve=ecdsaRR.SECP256k1
+        )
+        vk_custom = sk_custom.get_verifying_key()
+        pubkey_custom = '04' + vk_custom.to_string().hex()
+
+        # Verify both methods produce the same result
+        if pubkey_standard != pubkey_custom:
+            raise RuntimeError(
+                f"Public key mismatch!\n"
+                f"  Standard ecdsa: {pubkey_standard}\n"
+                f"  Custom ecdsaRR: {pubkey_custom}"
+            )
+
+        # Return the verified public key
+        return pubkey_standard
 
     def get_private_key(self):
         """

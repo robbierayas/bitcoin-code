@@ -388,6 +388,180 @@ Payload (variable)
 
 **Port:** 8333 (mainnet)
 
+## Advanced Concepts
+
+### Transaction Fees
+
+Bitcoin transaction fees are calculated based on transaction size in bytes, not the amount transferred.
+
+**Fee calculation:**
+```
+Fee = Transaction Size (bytes) × Fee Rate (satoshis/byte)
+```
+
+**Transaction size estimation:**
+- Basic transaction (1 input, 2 outputs): ~250 bytes
+- Each additional input: ~148 bytes
+- Each additional output: ~34 bytes
+
+**Example:**
+```
+Transaction with 1 input, 2 outputs:
+Size: 250 bytes
+Fee rate: 10 sat/byte
+Total fee: 2,500 satoshis (0.000025 BTC)
+```
+
+**Setting fee rate:**
+- Check mempool congestion
+- Use fee estimation APIs
+- Typical range: 1-100 sat/byte depending on network conditions
+- Higher fees = faster confirmation
+
+**Implementation:**
+```python
+# Calculate transaction size (estimate)
+inputs = 1
+outputs = 2
+estimated_size = 250 + (inputs - 1) * 148 + (outputs - 2) * 34
+
+# Set fee rate (satoshis per byte)
+fee_rate = 10  # sat/byte
+
+# Calculate total fee
+fee = estimated_size * fee_rate
+
+# Subtract fee from output amount
+output_amount = input_amount - fee
+```
+
+**Important:** The fee is not explicitly listed in the transaction. It's the difference between input and output amounts:
+```
+Fee = Sum(inputs) - Sum(outputs)
+```
+
+### Testing Transactions
+
+**Methods to test before broadcasting:**
+
+1. **Testnet** - Separate Bitcoin network with free test coins
+   - Different network magic: 0x0709110B
+   - Different port: 18333
+   - Test coins from faucets
+   - Identical protocol, zero value
+
+2. **Regtest** (Regression Test)
+   - Local private blockchain
+   - Generate blocks instantly
+   - Complete control over network
+   - Perfect for development
+
+3. **Local Validation**
+   - Build transaction locally
+   - Verify signature without broadcasting
+   - Use `verifyTxnSignature()` function
+   - Check transaction structure
+
+4. **Decode Raw Transaction**
+   - Use Bitcoin Core's `decoderawtransaction`
+   - Inspect all fields before sending
+   - Verify addresses and amounts
+   - Check script validity
+
+**Example validation:**
+```python
+from bitcoin import txnUtils
+
+# Create signed transaction
+signed_txn = txnUtils.makeSignedTransaction(...)
+
+# Verify signature locally (no broadcast)
+is_valid = txnUtils.verifyTxnSignature(signed_txn)
+
+if is_valid:
+    print("Transaction is valid!")
+    # Now safe to broadcast
+else:
+    print("Transaction signature invalid!")
+```
+
+### HD Wallets (BIP32/BIP39)
+
+The current implementation uses single private keys (one key = one address). Production wallets use Hierarchical Deterministic (HD) wallets for better privacy and key management.
+
+**BIP39: Mnemonic Seed Phrases**
+
+Convert random entropy to memorable words:
+```
+Random Entropy (128-256 bits)
+  ↓
+Mnemonic Words (12-24 words)
+  ↓ PBKDF2-HMAC-SHA512 (with optional passphrase)
+Master Seed (512 bits)
+```
+
+**Example mnemonic (12 words):**
+```
+witch collapse practice feed shame open despair creek road again ice least
+```
+
+**BIP32: Hierarchical Deterministic Keys**
+
+Derive unlimited keys from single master seed:
+```
+Master Seed (512 bits)
+  ↓ Split
+Master Private Key (256 bits) + Chain Code (256 bits)
+  ↓ For each derivation
+HMAC-SHA512(chain_code, parent_key + index)
+  ↓ Split
+Child Private Key + Child Chain Code
+```
+
+**Derivation Path Structure:**
+```
+m / purpose' / coin_type' / account' / change / address_index
+
+Example: m/44'/0'/0'/0/0
+- m: Master key
+- 44': BIP44 (hardened derivation, indicated by ')
+- 0': Bitcoin (coin type)
+- 0': Account 0
+- 0: External chain (receiving addresses)
+- 0: First address
+
+Next address: m/44'/0'/0'/0/1
+Change address: m/44'/0'/0'/1/0
+```
+
+**Advantages of HD Wallets:**
+- Single backup (mnemonic) for infinite addresses
+- Better privacy (new address per transaction)
+- Organized structure (accounts, change addresses)
+- Can derive public keys without private keys (watch-only wallets)
+
+**Implementation note:**
+This educational codebase uses simple single-key wallets. For HD wallet implementation, see production libraries like `python-bitcoinlib` or `pycoin`.
+
+**Derivation process:**
+```python
+# Pseudocode for key derivation
+def derive_child_key(parent_key, chain_code, index):
+    if index >= 0x80000000:  # Hardened derivation
+        data = b'\x00' + parent_key + index.to_bytes(4, 'big')
+    else:  # Normal derivation
+        data = parent_public_key + index.to_bytes(4, 'big')
+
+    # HMAC-SHA512
+    I = hmac.new(chain_code, data, hashlib.sha512).digest()
+
+    # Split result
+    child_key = (int.from_bytes(I[:32]) + parent_key) % n
+    child_chain_code = I[32:]
+
+    return child_key, child_chain_code
+```
+
 ## Common Tasks
 
 ### Generate Address

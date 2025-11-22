@@ -314,6 +314,241 @@ These are **educational implementations** for understanding Bitcoin internals.
 - Or `Crypto.Hash.RIPEMD` (PyCrypto)
 - These custom implementations are **not security audited**
 
+## Detailed Algorithm Explanations
+
+### Elliptic Curve Cryptography (ECDSA secp256k1)
+
+#### The secp256k1 Curve
+
+Bitcoin uses the secp256k1 elliptic curve:
+
+**Curve equation:** `y² = x³ + 7 (mod p)`
+
+**Parameters:**
+- **p** = 2²⁵⁶ - 2³² - 977 (field prime, defines the finite field)
+- **G** = Generator point (fixed starting point for all key generation)
+  - Gx = `0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798`
+  - Gy = `0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8`
+- **n** = Order (number of valid private keys ≈ 1.158 × 10⁷⁷)
+  - n = `0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141`
+
+**Order meaning:**
+```
+1 × G = G
+2 × G = some point
+3 × G = another point
+...
+n × G = point at infinity (wraps back to zero)
+(n+1) × G = G (cycle repeats)
+```
+
+Valid private keys range from 1 to (n-1).
+
+#### Private Key → Public Key (Point Multiplication)
+
+**The one-way function:**
+```
+Public Key = k × G
+```
+Where k is the private key (secret number).
+
+**Security:**
+- **Easy direction:** k → Public Key (fast computation using double-and-add)
+- **Hard direction:** Public Key → k (Elliptic Curve Discrete Logarithm Problem - computationally infeasible)
+
+This one-way property is what makes Bitcoin secure!
+
+#### Point Multiplication Algorithm (Double-and-Add)
+
+Instead of adding G to itself k times, we use a binary approach:
+
+**Example: Calculate 23 × G**
+
+1. Convert to binary: 23 = 10111₂
+2. Process left to right:
+   - Bit 1: Result = G
+   - Bit 0: Double → Result = 2G
+   - Bit 1: Double → 4G, add G → Result = 5G
+   - Bit 1: Double → 10G, add G → Result = 11G
+   - Bit 1: Double → 22G, add G → Result = 23G
+
+**Alternative (powers of 2):**
+```
+23 = 16 + 4 + 2 + 1
+23G = (2⁴)G + (2²)G + (2¹)G + (2⁰)G
+
+Calculate by repeated doubling:
+G → 2G → 4G → 8G → 16G
+Then add: 16G + 4G + 2G + G = 23G
+```
+
+This reduces a 256-bit multiplication to only ~256 doublings and ~128 additions (on average).
+
+#### Point Addition Formulas
+
+**Adding two different points P + Q = R:**
+
+Given P(x₁, y₁) and Q(x₂, y₂):
+
+```
+Step 1: Calculate slope
+s = (y₂ - y₁) × (x₂ - x₁)⁻¹ mod p
+
+Step 2: Calculate x-coordinate of result
+x₃ = (s × s) - x₁ - x₂ mod p
+
+Step 3: Calculate y-coordinate of result
+y₃ = s × (x₁ - x₃) - y₁ mod p
+
+Result: R = (x₃, y₃)
+```
+
+**Point Doubling P + P = R:**
+
+Given P(x₁, y₁):
+
+```
+Step 1: Calculate slope (tangent to curve)
+s = (3 × x₁ × x₁) × (2 × y₁)⁻¹ mod p
+(For secp256k1, a=0, so numerator is 3x₁²)
+
+Step 2: Calculate x₃
+x₃ = (s × s) - 2 × x₁ mod p
+
+Step 3: Calculate y₃
+y₃ = s × (x₁ - x₃) - y₁ mod p
+
+Result: R = (x₃, y₃)
+```
+
+#### Modular Arithmetic
+
+**Modular Inverse:**
+
+Division doesn't exist in modular arithmetic. Instead of `a / b mod p`, we calculate:
+```
+a × b⁻¹ mod p
+```
+
+Where `b⁻¹` is the modular inverse: `b × b⁻¹ ≡ 1 (mod p)`
+
+**Example:**
+```
+Find 5 / 3 mod 7
+
+Step 1: Find 3⁻¹ mod 7
+3 × ? ≡ 1 (mod 7)
+3 × 5 = 15 = 2×7 + 1 ≡ 1 (mod 7)
+So 3⁻¹ = 5
+
+Step 2: Calculate
+5 / 3 = 5 × 5 = 25 = 3×7 + 4 ≡ 4 (mod 7)
+```
+
+#### Public Key Formats
+
+**Uncompressed (65 bytes):**
+```
+0x04 + x-coordinate (32 bytes) + y-coordinate (32 bytes)
+```
+
+**Compressed (33 bytes):**
+
+Since `y² = x³ + 7`, if you know x, you can calculate y² and take the square root. However, there are TWO possible y values (y and -y mod p).
+
+```
+If y is even: 0x02 + x-coordinate (32 bytes)
+If y is odd:  0x03 + x-coordinate (32 bytes)
+```
+
+The prefix byte tells which y value to use when reconstructing the full public key.
+
+#### ECDSA Signature Creation
+
+**Purpose:** Prove ownership of private key WITHOUT revealing it
+
+**Signing process:**
+```
+1. Pick random number r (nonce)
+2. Calculate R = r × G (point multiplication)
+3. Get x-coordinate of R, call it r_x
+4. Calculate: s = (z + r_x × k) / r mod n
+   Where:
+   - z = hash of transaction data
+   - k = private key
+   - n = curve order
+
+Signature = (r_x, s)
+```
+
+**Verification (anyone can do this):**
+```
+1. Calculate: P = (z/s) × G + (r_x/s) × PublicKey
+2. If P's x-coordinate equals r_x, signature is VALID
+```
+
+**Mathematical proof why this works:**
+```
+Since PublicKey = k × G:
+P = (z/s) × G + (r_x/s) × (k × G)
+P = (z/s + r_x × k/s) × G
+P = ((z + r_x × k)/s) × G
+
+Since s = (z + r_x × k)/r:
+P = ((z + r_x × k) × r/(z + r_x × k)) × G
+P = r × G = R ✓
+
+The x-coordinates match!
+```
+
+### Public Key Visibility and Security
+
+**Before spending (receiving only):**
+- Address visible: `1ABC...` (Base58Check encoded)
+- Public key: **HIDDEN** (only hash is in address)
+- Private key: **SECRET**
+
+**When spending (creating transaction):**
+- Transaction input includes: `<signature> <public key>`
+- Public key is now **VISIBLE** to everyone
+- Network verifies:
+  1. Hash(public key) matches the address you're spending from
+  2. Signature is valid using the revealed public key
+
+**Security implications:**
+- Once you spend, your public key is exposed
+- Quantum computers could potentially derive private key from public key
+- Best practice: **Don't reuse addresses** after spending
+- Use a new address for change outputs
+
+### Hash Function Flow
+
+**Complete Bitcoin address generation:**
+```
+Private Key (256-bit random number)
+    ↓
+ECDSA secp256k1 point multiplication (k × G)
+    ↓
+Public Key (x, y coordinates on curve)
+    ↓
+Compressed: 02/03 + x coordinate (33 bytes)
+Uncompressed: 04 + x + y (65 bytes)
+    ↓
+SHA-256 hash (32 bytes)
+    ↓
+RIPEMD-160 hash (20 bytes) ← "Hash160"
+    ↓
+Add version byte (0x00 for mainnet P2PKH)
+    ↓
+SHA-256 twice for checksum
+    ↓
+Append first 4 bytes of checksum
+    ↓
+Base58 encode (preserving leading zeros as '1')
+    ↓
+Bitcoin Address (starts with '1' for P2PKH)
+```
+
 ## Algorithm Documentation
 
 For comprehensive RIPEMD-160 algorithm documentation, see:
@@ -324,3 +559,4 @@ For comprehensive RIPEMD-160 algorithm documentation, see:
 - [Official RIPEMD-160 spec](https://homes.esat.kuleuven.be/~bosselae/ripemd160.html)
 - [Bitcoin Wiki - Technical background](https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses)
 - [RIPEMD-160 test vectors](https://homes.esat.kuleuven.be/~bosselae/ripemd160/pdf/AB-9601/AB-9601.pdf)
+- [SEC 2: Recommended Elliptic Curve Domain Parameters](https://www.secg.org/sec2-v2.pdf) - secp256k1 specification
