@@ -83,11 +83,24 @@ python myTransaction.py
 
 ---
 
+## Configuration
+
+Test keys and data are stored in `config.py`:
+- Private keys for tests
+- Sample transactions
+- Test addresses and signatures
+
+Import in tests:
+```python
+from config import TestKeys, TestTransactions, TestSignatures
+```
+
 ## Documentation
 
 - `bitcoin/README.md` - Bitcoin concepts and module details
 - `cryptography/README.md` - RIPEMD-160 implementation details
 - `CLAUDE.md` - Complete technical reference
+- `config.py` - Test keys and configuration
 
 ## Resources
 

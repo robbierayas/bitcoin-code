@@ -24,10 +24,40 @@ bitcoin-code/
 │   ├── ripemd160_backup.py       # Backup version
 │   └── rollback.py      # Experimental reverse engineering
 ├── output/              # Output files from test runs
+├── config.py            # Test keys and configuration
 └── windowsSetup.bat     # Windows setup script
 ```
 
 ## Core Modules
+
+### Configuration Module (`config.py`)
+
+Centralized test data and private keys used throughout tests.
+
+**Classes:**
+- `TestKeys` - Test private keys, WIF formats, and Bitcoin addresses
+- `TestTransactions` - Sample transaction data (signed, signable, public keys)
+- `TestSignatures` - DER signature test data
+- `TestRawTransactions` - Raw transaction creation test data
+
+**Usage in tests:**
+```python
+from config import TestKeys, TestTransactions, TestSignatures
+
+# Use test keys
+private_key = TestKeys.KEY1_HEX
+wif = TestKeys.KEY1_WIF
+
+# Use test transaction data
+txn = TestTransactions.TXN_SIGNED
+pubkey = TestTransactions.TXN_PUBKEY
+```
+
+**Benefits:**
+- Single source of truth for test data
+- Easy to update test keys across all tests
+- Clear documentation of test data
+- Avoids hardcoded values in tests
 
 ### Cryptography Module (`cryptography/`)
 

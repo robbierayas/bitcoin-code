@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import math
 import hashlib
-import utils
+from cryptography import base58Utils
 import binascii
 
 ordermap={
@@ -114,18 +114,18 @@ E0=int('c3d2e1f0',16)
 mask=4294967296;
 
 def myRollBack(address):
-	print 'Rollback address {}'.format(address)
-	basedecode=utils.base58CheckDecode(address)
-	print 'Rollback basedecode {}'.format(basedecode)
-	hex_data=basedecode.encode('hex')
-	print 'Rollback hexl {}'.format(hex_data)
-	Af_hex=hex_data[:8]
-	Bf_hex=hex_data[8:16]
-	Cf_hex=hex_data[16:24]
-	Df_hex=hex_data[24:32]
-	Ef_hex=hex_data[32:40]
-	print 'hnew {} {} {} {} {}'.format(Af_hex,Bf_hex,Cf_hex,Df_hex,Ef_hex)
-	print 'TO DO un-add final values'
+	print('Rollback address {}'.format(address))
+	basedecode = base58Utils.base58CheckDecode(address)
+	print('Rollback basedecode {}'.format(basedecode))
+	hex_data = basedecode.hex()
+	print('Rollback hexl {}'.format(hex_data))
+	Af_hex = hex_data[:8]
+	Bf_hex = hex_data[8:16]
+	Cf_hex = hex_data[16:24]
+	Df_hex = hex_data[24:32]
+	Ef_hex = hex_data[32:40]
+	print('hnew {} {} {} {} {}'.format(Af_hex, Bf_hex, Cf_hex, Df_hex, Ef_hex))
+	print('TO DO un-add final values')
 	Al=int('82a24ea5',16)
 	Bl=int('11e8ef41',16)
 	Cl=int('e109aea8',16)
@@ -137,20 +137,20 @@ def myRollBack(address):
 	Cr=int('a91d7fa6',16)
 	Dr=int('0c8673c2',16)
 	Er=int('ac4b8c30',16)
-	print ''
-	print 'h_left 15 {} {} {} {} {}'.format(hex(Al),hex(Bl),hex(Cl),hex(Dl),hex(El))
-	print 'h_right 15 {} {} {} {} {}'.format(hex(Ar),hex(Br),hex(Cr),hex(Dr),hex(Er))
-	print ''
+	print('')
+	print('h_left 15 {} {} {} {} {}'.format(hex(Al), hex(Bl), hex(Cl), hex(Dl), hex(El)))
+	print('h_right 15 {} {} {} {} {}'.format(hex(Ar), hex(Br), hex(Cr), hex(Dr), hex(Er)))
+	print('')
 	X=['' for i in range(8)]+[int('00000080',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000100',16), int('00000000',16)]
 	#X[6]=int('9fd3a02e',16)
 	Xrr=['' for i in range(8)]+[int('00000080',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000000',16), int('00000100',16), int('00000000',16)]
 	for round in range(4,3,-1):
 	#for round in range(4,-1,-1):
-		print 'round {}'.format(round)
+		print('round {}'.format(round))
 		for j in range(15,10,-1):
 		#for j in range(15,-1,-1):
-			print 'j {}'.format(j)
-			
+			print('j {}'.format(j))
+
 
 
 
@@ -163,10 +163,10 @@ def myRollBack(address):
 			#print 'right'
                         #Ar,Br,Cr,Dr,Er,Xr=dcompression(Ar,Br,Cr,Dr,Er,functionmap_right.get(round, "nothing"),Xrr[rr],Kr,sr)
 			#Ar,Br,Cr,Dr,Er,Xr=rcompression(Ar,Br,Cr,Dr,Er,functionmap_right.get(round, "nothing"),X,round,j)
-			print ''
+			print('')
 
-			print 'h_left {} {} {} {} {} {}'.format(j-1,hex(Al),hex(Bl),hex(Cl),hex(Dl),hex(El))
-			print 'X {} '.format(X)
+			print('h_left {} {} {} {} {} {}'.format(j-1, hex(Al), hex(Bl), hex(Cl), hex(Dl), hex(El)))
+			print('X {} '.format(X))
 			#print 'h_right {} {} {} {} {} {}'.format(j-1,hex(Ar),hex(Br),hex(Cr),hex(Dr),hex(Er))
 
 def rcompression(A,B,C,D,E,f,X,round,j):
@@ -188,7 +188,7 @@ def rcompression(A,B,C,D,E,f,X,round,j):
 		# print 'pre-doperation (j={}){} {} {} {} {} '.format(j,hex(A),hex(B),hex(C),hex(D),hex(E))
 		A_out,C_out,X_out=doperation(A,B,C,D,E,f,X[r],K,s)
 		if X[r]!=X_out:
-			print 'Xr!=Xout {} {}'.format(X[r],X_out)
+			print('Xr!=Xout {} {}'.format(X[r], X_out))
 		# print 'post-doperation(j={}) {} {} {} {} {} '.format(j-1,hex(A),hex(B),hex(C),hex(D),hex(E))
 	else:
 		# print 'X undefined recurse'
@@ -209,7 +209,7 @@ def rcompression(A,B,C,D,E,f,X,round,j):
 	return A,B,C,D,E,X_out
 
 def findX_r(A,B,C,D,E,f,X,r,K,s,round,j):
-	print '          findX_r'
+	print('          findX_r')
 	C_out=ROR(D,10)%mask
 	#print '          f {}'.format(hex(f))
 	A_out=B
@@ -221,7 +221,7 @@ def findX_r(A,B,C,D,E,f,X,r,K,s,round,j):
 	A_out3=(A_out2-K)%mask
 	#print '          A_out3 {}'.format(hex(A_out3))
 
-	print '         begin finding X'
+	print('         begin finding X')
 	Cl=C_out
 	Dl=E
 	Bl=C
@@ -238,9 +238,9 @@ def findX_r(A,B,C,D,E,f,X,r,K,s,round,j):
 		All,Bll,Cll,Dll,Ell,Xl2=rcompression(Al,Bl,Cl,Dl,El,f,X,round,j-1)
 		# print '         post-rcompression All {} Bll {} Cll {} Dll {} Ell {} '.format(hex(All),hex(Bll),hex(Cll),hex(Dll),hex(Ell))
 		# print '         post-rcompression round {} j-1 {} Xl {}'.format(round,j-1,Xl2)
-		
+
 		# check value
-		print '         check value'
+		print('         check value')
 		Ac,Bc,Cc,Dc,Ec=compression(All,Bll,Cll,Dll,Ell,f,Xl2,round,j-1)
 		# print '         recompress Ac {} Bc {} Cc {} Dc {} Ec {} '.format(hex(Ac),hex(Bc),hex(Cc),hex(Dc),hex(Ec))
 
@@ -265,13 +265,13 @@ def findX_r(A,B,C,D,E,f,X,r,K,s,round,j):
 				i_X=5000000000
 				#use Xl
 				A_out4=(A_out3-Xl)%mask
-				print '         bruteforce worked'
+				print('         bruteforce worked')
 			i_X=i_X+1
 
 		i_A=i_A+1
 		if i_A==3785517729:
 			foundX=True
-			print '         bruteforce done'
+			print('         bruteforce done')
 		
 	
 	# print 'A_out4 {}'.format(hex(A_out4))
@@ -279,13 +279,13 @@ def findX_r(A,B,C,D,E,f,X,r,K,s,round,j):
 	if f==1:
 		A_out4=(A_out4-dfunction1(C,C_out,E))%mask
 	elif f==2:
-                A_out4=(A_out4-dfunction2(C,C_out,E))%mask
-        elif f==3:
-                A_out4=(A_out4-dfunction3(C,C_out,E))%mask
-        elif f==4:
-                A_out4=(A_out4-dfunction4(C,C_out,E))%mask
-        elif f==5:
-                A_out4=(A_out4-dfunction5(C,C_out,E))%mask
+		A_out4=(A_out4-dfunction2(C,C_out,E))%mask
+	elif f==3:
+		A_out4=(A_out4-dfunction3(C,C_out,E))%mask
+	elif f==4:
+		A_out4=(A_out4-dfunction4(C,C_out,E))%mask
+	elif f==5:
+		A_out4=(A_out4-dfunction5(C,C_out,E))%mask
 	# print 'A_out4 {}'.format(hex(A_out4))
 	return A_out4%mask,C_out%mask,X_out
 
@@ -321,61 +321,61 @@ def doperation(A,B,C,D,E,f,X,K,s):
 	if f==1:
 		A_out4=(A_out4-dfunction1(C,C_out,E))%mask
 	elif f==2:
-                A_out4=(A_out4-dfunction2(C,C_out,E))%mask
-        elif f==3:
-                A_out4=(A_out4-dfunction3(C,C_out,E))%mask
-        elif f==4:
-                A_out4=(A_out4-dfunction4(C,C_out,E))%mask
-        elif f==5:
-                A_out4=(A_out4-dfunction5(C,C_out,E))%mask
+		A_out4=(A_out4-dfunction2(C,C_out,E))%mask
+	elif f==3:
+		A_out4=(A_out4-dfunction3(C,C_out,E))%mask
+	elif f==4:
+		A_out4=(A_out4-dfunction4(C,C_out,E))%mask
+	elif f==5:
+		A_out4=(A_out4-dfunction5(C,C_out,E))%mask
 	# print '         doperation A_out4 {}'.format(hex(A_out4))
 	return A_out4%mask,C_out%mask,X
 
 def dfunction1(B,C,D):
 	binB=int(bin(B)[2:],2)
-	
-        binC=int(bin(C)[2:],2)
 
-        binD=int(bin(D)[2:],2)
+	binC=int(bin(C)[2:],2)
 
-        num=binB^binC^binD
+	binD=int(bin(D)[2:],2)
+
+	num=binB^binC^binD
 	return num
 
 def dfunction2(B,C,D):
-        binB=int(bin(B)[2:],2)
+	binB=int(bin(B)[2:],2)
 
-        binC=int(bin(C)[2:],2)
+	binC=int(bin(C)[2:],2)
 
-        binD=int(bin(D)[2:],2)
-        num=(binB&binC)|(~binB&binD)
-        return num
+	binD=int(bin(D)[2:],2)
+	num=(binB&binC)|(~binB&binD)
+	return num
 
 def dfunction3(B,C,D):
-        binB=int(bin(B)[2:],2)
-        binC=int(bin(C)[2:],2)
-        binD=int(bin(D)[2:],2)
-        num=(binB|~binC)^binD
-        return num
+	binB=int(bin(B)[2:],2)
+	binC=int(bin(C)[2:],2)
+	binD=int(bin(D)[2:],2)
+	num=(binB|~binC)^binD
+	return num
 
 
 def dfunction4(B,C,D):
-        binB=int(bin(B)[2:],2)
+	binB=int(bin(B)[2:],2)
 
-        binC=int(bin(C)[2:],2)
+	binC=int(bin(C)[2:],2)
 
-        binD=int(bin(D)[2:],2)
-        num=(binB&binD)|(binC&~binD)
-        return num
+	binD=int(bin(D)[2:],2)
+	num=(binB&binD)|(binC&~binD)
+	return num
 
 
 def dfunction5(B,C,D):
-        binB=int(bin(B)[2:],2)
+	binB=int(bin(B)[2:],2)
 
-        binC=int(bin(C)[2:],2)
+	binC=int(bin(C)[2:],2)
 
-        binD=int(bin(D)[2:],2)
+	binD=int(bin(D)[2:],2)
 	num=binB^(binC|~binD)
-        return num
+	return num
 
 
 def ROL(C,s):
@@ -387,14 +387,14 @@ def ROR(C,s):
 	return C_rot
 
 def little_end(string,base = 16):
-    t = ''
-    if base == 2:
-        s= 8
-    if base == 16:
-        s = 2
-    for x in range(len(string)/s):
-        t = string[s*x:s*(x+1)] + t
-    return t
+	t = ''
+	if base == 2:
+		s= 8
+	if base == 16:
+		s = 2
+	for x in range(len(string)//s):
+		t = string[s*x:s*(x+1)] + t
+	return t
 
 
 
@@ -431,13 +431,13 @@ def operation(A,B,C,D,E,f,X,K,s):
 	if f==1:
 		A_out=(A_out+dfunction1(B,C,D))%mask
 	elif f==2:
-                A_out=(A_out+dfunction2(B,C,D))%mask
-        elif f==3:
-                A_out=(A_out+dfunction3(B,C,D))%mask
-        elif f==4:
-                A_out=(A_out+dfunction4(B,C,D))%mask
-        elif f==5:
-                A_out=(A_out+dfunction5(B,C,D))%mask
+		A_out=(A_out+dfunction2(B,C,D))%mask
+	elif f==3:
+		A_out=(A_out+dfunction3(B,C,D))%mask
+	elif f==4:
+		A_out=(A_out+dfunction4(B,C,D))%mask
+	elif f==5:
+		A_out=(A_out+dfunction5(B,C,D))%mask
 	A_out000=(A_out+X)%mask
 	A_out00=(A_out000+K)%mask
 	A_out0=ROL(A_out00,s)%mask

@@ -264,15 +264,10 @@ def RIPEMD160(data):
 
 
 # ============================================================================
-# VERIFICATION TEST
+# TESTING
 # ============================================================================
-
-if __name__ == '__main__':
-    # Test with empty string
-    result = RIPEMD160('')
-    expected = '9c1185a5c5e9fc54612808977ee8f548b2258d31'
-
-    print("RIPEMD160('') =")
-    print("  Result:  ", result)
-    print("  Expected:", expected)
-    print("  Status:  ", "PASS" if result == expected else "FAIL")
+#
+# Run tests with:
+#   cd cryptography/tests
+#   python test_ripemd160.py
+#

@@ -22,7 +22,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import math
 import hashlib
-import utils
 
 
 # ============================================================================
@@ -387,26 +386,10 @@ def little_end(string, base=16):
 
 
 # ============================================================================
-# VERIFICATION TEST
+# TESTING
 # ============================================================================
-
-if __name__ == '__main__':
-    print("=" * 70)
-    print("RIPEMD-160 Educational Implementation - Verbose Mode")
-    print("=" * 70)
-    print()
-
-    # Test with a simple public key (65 bytes uncompressed, starts with 04)
-    test_pubkey = '0450863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b23522cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6'
-
-    print("Input public key:")
-    print(test_pubkey)
-    print()
-
-    result = myRipeMD160(test_pubkey, verbose=True)
-
-    print()
-    print("=" * 70)
-    print("Final Result (Hash160):")
-    print(result.hex())
-    print("=" * 70)
+#
+# Run tests with:
+#   cd cryptography/tests
+#   python test_ripemd160_educational.py
+#
