@@ -188,6 +188,29 @@ class KeyPair:
         private_key_hex = sk.to_string().hex()
         return cls(private_key_hex)
 
+    @classmethod
+    def from_mnemonic(cls, mnemonic, passphrase=""):
+        """
+        Create KeyPair from BIP39 mnemonic seed phrase.
+
+        Args:
+            mnemonic (str): Space-separated mnemonic words (12, 15, 18, 21, or 24 words)
+            passphrase (str): Optional passphrase for additional security (default: "")
+
+        Returns:
+            KeyPair: New KeyPair instance derived from mnemonic
+
+        Example:
+            >>> mnemonic = "grit problem ball awesome symbol leopard coral toddler must alien ocean satisfy"
+            >>> keypair = KeyPair.from_mnemonic(mnemonic)
+            >>> isinstance(keypair, KeyPair)
+            True
+        """
+        from cryptography import bip39
+
+        private_key_hex = bip39.mnemonic_to_private_key(mnemonic, passphrase)
+        return cls(private_key_hex)
+
     def __repr__(self):
         """String representation (doesn't expose private key)."""
         return f"KeyPair(address='{self.get_address()}')"
