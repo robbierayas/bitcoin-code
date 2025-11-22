@@ -4,6 +4,19 @@ This project is an educational implementation of Bitcoin protocol components fro
 
 **Reference:** Based on "Bitcoins the hard way: Using the raw Bitcoin protocol" - http://www.righto.com/2014/02/bitcoins-hard-way-using-raw-bitcoin.html
 
+---
+
+## 📚 Development Guidelines
+
+**For Python Development Best Practices:** See [`claude.md.coder`](claude.md.coder)
+- Python coding standards and patterns
+- Async/await patterns in Python
+- Database operations and testing
+- Type hints and modern Python features
+- Converted from Node.js guide (`bitcoin/node.txt`) for Python equivalents
+
+---
+
 ## Project Structure
 
 ```

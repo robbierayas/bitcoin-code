@@ -38,6 +38,47 @@ P2P message utilities:
 
 Generate Bitcoin addresses from private keys.
 
+#### wallet.py ✓ (NEW - OBJECT ORIENTED)
+**Bitcoin wallet class for key and transaction management**
+
+Object-oriented wallet with keypair encapsulation.
+
+**Class: Wallet**
+- `keypair` - KeyPair instance (public attribute)
+- Constructor takes optional `privatekeyhex` (defaults to TestKeys.KEY3_HEX)
+
+**Tests:** bitcoin/tests/test_wallet.py (18 tests)
+
+**Main usage:**
+```python
+from bitcoin.wallet import Wallet
+
+# Create with default key (KEY3_HEX)
+wallet = Wallet()
+
+# Create from private key
+wallet = Wallet(private_key_hex)
+
+# Access keypair
+pub = wallet.keypair.publickey
+address = wallet.get_address()
+
+# WIF conversion
+wif = wallet.export_wif()
+wallet = Wallet.from_wif(wif)
+
+# Generate random wallet
+wallet = Wallet.generate()
+
+# Sign and verify
+signature = wallet.sign_message(message_hash)
+is_valid = wallet.verify_message(message_hash, signature)
+```
+
+**Uses:** KeyPair class from cryptography module
+
+**Dependencies:** cryptography.keypair, config
+
 #### makeAddr.py
 **Generate random Bitcoin address**
 
@@ -66,14 +107,64 @@ public_key = myWallet.createAddress('a2d43efac7e99b7e...')
 
 Create and sign Bitcoin transactions.
 
+#### transaction.py ✓ (NEW - OBJECT ORIENTED)
+**Transaction class for creating and sending Bitcoin transactions**
+
+Object-oriented transaction creation with wallet integration.
+
+**Class: Transaction**
+- Constructor takes `wallet` parameter
+- `raw_txn` - Raw transaction hex (set after create())
+- `signed` - Boolean flag for transaction state
+
+**Tests:** bitcoin/tests/test_transaction.py (20 tests)
+
+**Main usage:**
+```python
+from bitcoin.wallet import Wallet
+from bitcoin.transaction import Transaction
+
+# Create wallet and transaction
+wallet = Wallet.from_wif(wif)
+transaction = Transaction(wallet)
+
+# Create signed transaction
+signed_txn = transaction.create(
+    prev_txn_hash="c39e394d...",
+    prev_output_index=0,
+    source_address="133txdx...",
+    outputs=[
+        [24321, "1KKKK6N21XKo48zWKuQKXdvSsCf95ibHFa"],
+        [20000, "15nhZbXnLMknZACbb3Jrf1wPCD9DWAcqd7"]
+    ]
+)
+
+# Verify signature
+is_valid = transaction.verify()
+
+# Get transaction hash (TXID)
+txid = transaction.get_transaction_hash()
+# Use txid as prev_txn_hash in next transaction
+
+# Send to network with chunk receiving (WARNING: broadcasts to mainnet!)
+# transaction.send(receive_response=True)  # Receives and processes chunks
+# transaction.send(receive_response=False) # Send only, no response
+```
+
+**Uses:** Wallet class, txnUtils, msgUtils
+
+**Dependencies:** bitcoin.wallet, bitcoin.txnUtils, bitcoin.msgUtils
+
 #### txnUtils.py ✓
-**Transaction utilities (library)**
+**Transaction utilities (library - legacy)**
 
 Core transaction functions:
 - `makeRawTransaction()` - Build unsigned transaction
 - `makeSignedTransaction()` - Create and sign with ECDSA
 - `verifyTxnSignature()` - Verify signature is valid
 - ScriptSig and ScriptPubKey generation
+
+**Note:** For new code, prefer using Transaction class for better OOP design.
 
 **Tests:** bitcoin/tests/test_txnUtils.py (5 tests)
 
@@ -183,11 +274,12 @@ Modified version of txnUtils.py - preserved for reference
 
 | File | Tests | Status | Description |
 |------|-------|--------|-------------|
+| wallet.py | 18 ✓ | Production | **OOP Wallet class** |
+| transaction.py | 20 ✓ | Production | **OOP Transaction class** |
 | msgUtils.py | 2 ✓ | Production | Protocol & P2P messages |
-| txnUtils.py | 5 ✓ | Production | Transaction utils |
-| myWallet.py | 4 ✓ | Working | Wallet functions |
+| txnUtils.py | 5 ✓ | Production | Transaction utils (legacy) |
+| myWallet.py | - | Working | Wallet functions (legacy) |
 | makeAddr.py | - | Working | Address generator |
-| makeTransaction.py | - | Working | Transaction example |
 | myTransaction.py | - | Working | Multi-method test |
 | minimalPeerConnection.py | - | Working | Network demo |
 | minimalSendTxn.py | - | Working | TX broadcast |
@@ -195,7 +287,7 @@ Modified version of txnUtils.py - preserved for reference
 | mine.py | - | Working | Mining demo |
 | txnUtilsMod.py | - | Archive | Modified version |
 
-**Total:** 11 tests passing
+**Total:** 45 tests passing (18 wallet + 20 transaction + 2 msgUtils + 5 txnUtils)
 
 ## Testing
 
@@ -203,12 +295,13 @@ Run all tests:
 ```bash
 cd bitcoin/tests
 
+python test_wallet.py       # 18 tests - OOP Wallet class
+python test_transaction.py  # 20 tests - OOP Transaction class (includes hash tests)
 python test_msgUtils.py     # 2 tests - Protocol & P2P messages
-python test_txnUtils.py     # 5 tests - Transaction utils
-python test_myWallet.py     # 4 tests - Wallet functions
+python test_txnUtils.py     # 5 tests - Transaction utils (legacy)
 ```
 
-**Note:** Base58 encoding tests are in `cryptography/tests/test_base58Utils.py`
+**Note:** Cryptography tests are in `cryptography/tests/`
 
 ## Python Version
 

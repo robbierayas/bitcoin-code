@@ -75,48 +75,48 @@ def processChunk(header, payload):
     """ Processes a response from a peer."""
     magic, cmd, payload_len, checksum = struct.unpack('<L12sL4s', header)
     if len(payload) != payload_len:
-        print 'BAD PAYLOAD LENGTH', len(payload), payload_len
-        
-    cmd = cmd.replace('\0', '') # Remove null termination
-    print '--- %s ---' % cmd
-    
-    if cmd == 'version':
+        print('BAD PAYLOAD LENGTH', len(payload), payload_len)
+
+    cmd = cmd.replace(b'\0', b'') # Remove null termination
+    print('--- %s ---' % cmd)
+
+    if cmd == b'version':
         version, services, timestamp, addr_recv, addr_from, nonce = struct.unpack('<LQQ26s26sQ', payload[:80])
         agent, agent_len = processVarStr(payload[80:])
 
         start_height = struct.unpack('<L', payload[80 + agent_len:84 + agent_len])[0]
-        print '%d %x %x %s %s %x %s %x' % (
+        print('%d %x %x %s %s %x %s %x' % (
             version, services, timestamp, processAddr(addr_recv), processAddr(addr_from),
-            nonce, agent, start_height)
-    elif cmd == 'inv':
+            nonce, agent, start_height))
+    elif cmd == b'inv':
         count, offset = processVarInt(payload)
         result = []
         for i in range(0, count):
             type, hash = struct.unpack('<L32s', payload[offset:offset+36])
             # Note: hash is reversed
-            print type, hash[::-1].encode('hex')
+            print(type, hash[::-1].hex())
             if type == 2:
                 sys.exit(0)
             result.append([type, hash])
             offset += 36
-        print '---\n'
+        print('---\n')
         return result
-    elif cmd == 'addr':
+    elif cmd == b'addr':
         global addrCount
         count, offset = processVarInt(payload)
         for i in range(0, count):
             timestamp, = struct.unpack('<L', payload[offset:offset+4])
             addr = processAddr(payload[offset+4:offset+30])
             offset += 30
-            print addrCount, time.ctime(timestamp), addr
+            print(addrCount, time.ctime(timestamp), addr)
             addrCount += 1
     else:
         dump(payload)
-    print '---\n'
+    print('---\n')
 
 
 def dump(s):
-    print ':'.join(x.encode('hex') for x in s)
+    print(':'.join(x.hex() for x in s))
 
 
 def getVersionMsg():

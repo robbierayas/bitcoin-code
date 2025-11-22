@@ -1,0 +1,320 @@
+# Node.js Development Guide for Claude
+
+## Node.js Best Practices and Code Quality
+
+### Code Quality Standards
+- **Variables**: Use descriptive camelCase (`currentUser`, `databaseConnection`)
+- **Constants**: Use UPPER_SNAKE_CASE for module-level constants
+- **Functions**: Arrow functions for callbacks, named functions for main logic
+- **Classes**: PascalCase class names (`DataProcessor`, `UserService`)
+- **Files**: camelCase for files, kebab-case for directories
+
+### Async Patterns
+```javascript
+// ✅ Preferred: async/await
+async function processData(input) {
+    try {
+        const result = await dataService.process(input);
+        return result;
+    } catch (error) {
+        console.error('Processing failed:', error);
+        throw error;
+    }
+}
+
+// ✅ Promise handling
+const results = await Promise.all(items.map(processItem));
+
+// ❌ Avoid callback hell
+getData(function(err, data) {
+    processData(data, function(err, result) {
+        // nested callbacks
+    });
+});
+```
+
+### Error Handling
+```javascript
+// ✅ Proper error handling
+try {
+    const data = JSON.parse(jsonString);
+    const result = await processData(data);
+    return result;
+} catch (error) {
+    console.error('Error processing data:', error.message);
+    throw new Error(`Data processing failed: ${error.message}`);
+}
+
+// ✅ Input validation
+function validateInput(data) {
+    if (!data || typeof data !== 'object') {
+        throw new Error('Invalid input: expected object');
+    }
+    return true;
+}
+```
+
+### Database Operations (Common Patterns)
+```javascript
+// ✅ Safe database queries with parameters
+const result = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+
+// ✅ Transaction handling
+const transaction = await db.beginTransaction();
+try {
+    await db.query('INSERT INTO...', params1, transaction);
+    await db.query('UPDATE...', params2, transaction);
+    await transaction.commit();
+} catch (error) {
+    await transaction.rollback();
+    throw error;
+}
+
+// ✅ Connection cleanup
+finally {
+    if (connection) await connection.close();
+}
+```
+
+### Node.js Specific Efficiency
+- Use `require.cache` considerations for module loading
+- Prefer `const` over `let/var` for immutable references
+- Use array methods (`map`, `filter`, `reduce`) over loops
+- Implement proper error boundaries in async functions
+- Use streaming for large file operations
+
+### Memory Efficiency
+- Use streams for large file processing (`fs.createReadStream`)
+- Implement pagination for database queries
+- Clear event listeners and timers
+- Close database connections properly
+- Use `process.nextTick()` vs `setTimeout()` appropriately
+
+## Claude Performance and Search Strategy
+
+### ⚡ Efficient Search Strategy
+
+**PRINCIPLE: Assume files are named logically, search only when necessary**
+
+### Tool Selection Priority
+1. **Read** tool for specific files (fastest)
+2. **Check likely files first** - assume logical naming
+3. **Grep** tool for text search (with rg backend)
+4. **Glob** tool for file pattern matching
+5. **LS** tool for directory listing
+6. **Bash** tool only when others insufficient
+
+### Smart Search Strategy (Minimal Searching)
+1. **Assume logical naming** - `database.js` has database functions
+2. **Read likely files directly** - faster than searching
+3. **Simple patterns only**: `grep "functionName"` not complex regex
+4. **Check class files**: Most functions are in classes or modules
+
+### Tool Usage for Claude
+- **✅ Preferred**: Use Grep, Glob, LS, Read tools for file operations
+- **✅ Available**: bash with standard tools (vary by platform)
+- **⚡ Fast**: Use `rg` (ripgrep) if available - faster than grep
+- **❌ Avoid**: Don't use bash for simple file reads - use Read tool instead
+
+## Architecture Patterns and Best Practices
+
+### Core Architecture Patterns
+- **Interface Pattern**: Abstract interfaces for external dependencies
+- **Factory Pattern**: Factory classes for dependency injection
+- **State Machine**: Workflow state management with transitions
+- **Async Job Processing**: Background job processing with dependency injection
+- **Messaging Layer**: Interface-based messaging service abstractions
+- **Storage**: Database abstraction with initialization patterns
+- **Integration**: Clean separation of external service integrations
+
+### Factory Pattern Usage
+```javascript
+// ✅ Factory pattern for dependency creation
+const db = await DatabaseFactory.createDatabase(config);
+const messaging = await MessagingFactory.createService(config);
+
+// Configuration loading
+const configManager = new ConfigManager();
+const config = configManager.getConfig();
+```
+
+### Async Job Pattern
+```javascript
+async initialize(dependencies) {
+    const { database, externalService, configManager, messagingClient } = dependencies;
+    this.database = database;
+    this.service = new CoreService(configManager);
+    await this.service.initialize();
+    this.externalService = externalService;
+    this.messagingClient = messagingClient;
+}
+```
+
+### Testing with Mocks
+```javascript
+// Jest testing with comprehensive mocks
+npm test                    // Run tests
+npm run test:watch         // Watch mode
+
+// Mock pattern
+const MockDatabase = require('./mocks/MockDatabase');
+const MockService = require('./mocks/MockService');
+
+describe('JobClass', () => {
+    test('should process data correctly', async () => {
+        const job = new JobClass();
+        await job.initialize({ database: mockDb, service: mockService });
+        // Test implementation
+    });
+});
+```
+
+## Advanced Development Patterns and Reliability
+
+### State Machine and Integration Reliability Patterns
+
+#### State Machine Reliability Best Practices
+**Critical Reliability Patterns:**
+- **Normalized State Comparisons**: Always compare states using normalized forms to prevent inconsistencies from case variations, spaces, or formatting differences
+- **Label Consistency Validation**: Implement warnings and checks for conflicting workflow labels that could indicate invalid state combinations
+- **Comprehensive Error Cleanup**: During error scenarios, remove all completion labels systematically to prevent orphaned state indicators
+- **Fallback Pattern Matching**: For status mapping systems, implement priority-based mappings with intelligent fallback patterns when primary mappings fail
+- **Transaction-Safe Hook Execution**: Execute post-transition hooks only after successful transitions, with error recovery hooks for rollback scenarios
+
+#### Database Method Consistency Patterns
+**Interface Method Alignment:**
+- **Method Name Verification**: Always verify interface method names match implementations, especially when working across multiple layers (web routes, services, database)
+- **Runtime Error Prevention**: Interface method mismatches cause runtime `TypeError: method is not a function` errors that are easily missed during development
+- **Systematic Method Auditing**: When encountering method not found errors, grep the entire codebase for similar method name variations to catch all instances
+
+#### Windows Development Reliability Patterns
+**File System Handling:**
+- **Database File Locking**: On Windows systems, implement retry mechanisms with delays for database file operations in tests to handle file locking issues
+- **Graceful Database Closure**: Use proper async/await patterns with callback-based database close operations to ensure complete cleanup
+- **Test File Cleanup**: Implement robust cleanup with multiple retry attempts for temporary files that may remain locked by the operating system
+- **File Update Error Resilience**: IDE and file system errors may show "Error editing file" messages even when changes succeed - always verify actual file contents rather than relying on error messages alone
+- **Race Condition Mitigation**: File watchers, linters, or background processes can interfere with file operations - check for concurrent file access when edit errors occur frequently
+
+#### Service Layer Refactoring and State Management Patterns
+**Centralized State Management Best Practices:**
+- **Interface Abstraction for State Operations**: When refactoring complex systems, centralize state management operations in service layer interfaces rather than distributing logic across job classes - this creates single points of responsibility for state transitions and label management while keeping business logic focused on processing decisions
+- **Mock Implementation Consistency Requirements**: During refactoring, ensure test mocks include all constants and methods that production implementations provide - missing constants in mock objects cause undefined reference errors that manifest as silent failures in boolean operations, making tests pass incorrectly or fail unexpectedly
+- **Label Constant Management Strategy**: Maintain label constants in multiple locations (interface definitions, implementation classes, and test mocks) with identical naming and values - inconsistent constant definitions across layers cause runtime lookup failures that are difficult to debug, especially in asynchronous job processing systems
+- **Test-Driven Refactoring Validation**: Use failing tests as implementation specifications during refactoring - test expectations reveal the exact method signatures, parameter objects, and constant values that need to be maintained, providing clear guidance for preserving external API contracts while restructuring internal implementations
+- **Service Layer Method Signature Preservation**: When centralizing state operations, maintain existing method signatures for external consumers while internally delegating to centralized implementations - this allows incremental refactoring without breaking existing integrations or requiring simultaneous updates across multiple system components
+
+#### External API Integration Debugging and Optimization Patterns
+**Production System Reliability Best Practices:**
+- **Pre-request Status Validation**: Before making API calls to external services, verify current state to prevent unnecessary requests - checking if target status already matches current status can eliminate redundant network calls and improve performance
+- **Comprehensive Input Validation Strategies**: Implement multi-layered validation for external identifiers that may contain sentinel values like "UNDEFINED" strings rather than null/undefined primitives - validate both existence and meaningful content to prevent runtime errors in downstream processing
+- **Progressive Error Recovery Patterns**: When external API integrations encounter invalid data conditions, implement graceful degradation by validating input parameters early and returning safe defaults rather than propagating errors through complex call chains
+- **Debug Context Enhancement for Complex Systems**: Add structured debug logging with JSON serialization of key context objects at state transition boundaries - this provides comprehensive visibility into system state during workflow operations without performance impact in production
+- **Method Parameter Signature Consistency**: When refactoring method calls across complex systems, ensure parameter ordering and types remain consistent - misaligned parameters (like passing individual values instead of objects) can cause subtle runtime failures that are difficult to trace
+- **State Machine Transition Verification**: In complex workflow systems, implement explicit logging and validation of state transitions to ensure intended behavior - incorrect transition logic can cause items to loop between states rather than progressing through intended workflow phases
+
+### Configuration and Testing Reliability Patterns
+
+#### Configuration Management and Default Value Patterns
+**Configuration System Reliability:**
+- **Nullish Coalescing for Zero Values**: Use nullish coalescing (`??`) instead of logical OR (`||`) when zero is a valid configuration value - logical OR treats zero as falsy causing unwanted fallback to defaults, while nullish coalescing only falls back for null/undefined, preserving intentional zero configurations in systems with numeric limits or counts
+- **Configuration Section Naming Consistency**: Maintain consistent naming between configuration file sections and code references - mismatches between config keys cause silent configuration failures where systems fall back to hardcoded defaults, making configuration changes ineffective and hiding misconfiguration issues
+- **Default Value Documentation**: Document expected default values in both code comments and configuration templates - when defaults change, update all references including tests, documentation, and example configurations to prevent confusion about system behavior when configuration values are missing or incorrectly specified
+- **Configuration Testing Strategy**: Create comprehensive tests that verify configuration loading behavior under various scenarios including missing sections, missing individual keys, and zero/false values - these tests catch configuration system regressions and ensure that intended defaults are actually applied when expected
+
+#### Database and Logging Integration Patterns
+**Logging Infrastructure Best Practices:**
+- **Configuration-Gated Logging**: Always implement feature flags for logging functionality to prevent production performance issues and enable debugging control
+- **Console-Based Debugging**: Add detailed console logging to database operations for immediate feedback during development and troubleshooting
+- **Method Call Chain Validation**: When third-party integrations bypass logging interfaces, ensure all code paths use centralized logging methods rather than direct API calls
+- **Return Type Consistency**: API service wrappers that return structured objects (containing text, usage, model info) require proper field extraction in calling code to prevent runtime type errors
+- **Configuration Structure Organization**: Use hierarchical configuration patterns like `logging.feature` rather than flat `featureLogging.enabled` for better organization and extensibility
+- **Modern JavaScript Private Fields**: Node.js v22+ fully supports private fields (`#privateField`) and methods (`#privateMethod()`) for true encapsulation without conventional underscore prefixes
+- **Prefer Private Methods**: Use private methods (`#methodName()`) over public methods for internal class logic to prevent external access and improve maintainability
+- **Private Method Benefits**: Private methods provide compile-time access control, better IDE support, and cleaner public APIs compared to underscore conventions
+- **Private Field Encapsulation**: Store sensitive data like API keys, internal state, and configuration in private fields (`#apiKey`, `#initialized`) rather than public properties
+
+#### Database Migration and Testing Patterns
+**Migration from Callback-Based to Synchronous APIs:**
+- **API Pattern Migration**: When migrating from callback-based database APIs (sqlite3) to synchronous APIs (better-sqlite3), systematically update all test mocks from `.mockImplementation((query, params, callback) => callback(null, data))` to `.mockReturnValue(data)` patterns
+- **Mock Expectation Updates**: Remove callback parameter expectations in test assertions - change `expect(db.all).toHaveBeenCalledWith(query, params, expect.any(Function))` to `expect(db.all).toHaveBeenCalledWith(query, params)` for synchronous APIs
+- **Database Result Validation**: Replace null-check patterns `if (!results)` with length-check patterns `if (!results || results.length === 0)` when migrating to APIs that return empty arrays instead of null for no results
+- **Stream Mock Complexity**: For CSV/file processing tests, ensure stream mocks properly simulate end events with `setTimeout(callback, 0)` to allow data processing to complete before triggering end handlers
+
+### Advanced Testing and Development Patterns
+
+#### Logging System Integration Patterns
+**Winston Logger Integration in Existing Codebases:**
+- **Mass Console Replacement Challenges**: When replacing `console.log` statements with structured logging across large codebases, automated sed/regex replacements often break complex nested structures, if/try blocks, and multi-line statements, requiring manual cleanup
+- **Logging Configuration Dynamics**: Implement centralized logging configuration that reads from project config files rather than just environment variables - allows runtime log level changes without redeployment (e.g., `config.logging.level` to switch between `info` and `debug`)
+- **Verbose Flag Migration**: When migrating from boolean `verbose` flags to structured logging levels, replace conditional logging blocks entirely rather than converting them - this prevents broken syntax from orphaned braces and incomplete control structures
+- **Test Impact from Logging**: Adding logging imports to modules can cause test failures due to circular dependencies, especially when logger modules try to read configuration files that don't exist in test environments - use try/catch blocks around config loading in logger setup
+- **Windows Logging Integration**: For Windows development environments, integrate PowerShell `Get-Content -Wait -Tail` as equivalent to Unix `tail -f` for real-time log monitoring in npm scripts, enabling live log viewing during development
+- **Error Handling Pattern Migration**: Update error mocking from callback patterns `.mockImplementation((query, callback) => callback(error))` to exception patterns `.mockImplementation(() => { throw error; })` for synchronous database APIs
+- **Test Suite Isolation**: Use proper `beforeEach` hooks with default mock return values to prevent test interference when migrating from callback-based to synchronous APIs - set `db.all.mockReturnValue([])` as default
+- **File System Mock Specificity**: When testing file existence checks, use implementation-specific mocks `fs.existsSync.mockImplementation((path) => path.includes('specific-file.csv') ? false : true)` rather than blanket returns to avoid false test passes
+- **Floating Point Precision Testing**: Use `expect(result).toBeCloseTo(expectedValue)` instead of `expect(result).toBe(expectedValue)` for calculation tests involving division operations that may introduce floating-point precision errors
+- **Progressive Test Fixing Strategy**: When facing many test failures from API migrations, fix database connection and core functionality tests first, then tackle integration tests - this provides stable foundation and reduces cascade failures
+- **Mock Scope Management**: Database mocks set in `beforeEach` may override test-specific mocks - ensure test-specific mock setups occur after `beforeEach` or use `jest.clearAllMocks()` strategically to prevent interference
+
+#### Test Modernization and Logging Migration Patterns
+**Systematic Test Failure Resolution:**
+- **Logger Import Dependencies**: Adding logger imports to abstract classes or base interfaces requires updating all tests that use those classes to properly mock the logger module - use `jest.mock('../utils/logger', () => ({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }))` at the test file level
+- **Console-to-Logger Test Migration**: When replacing console logging with structured logging, update test expectations from console spies `jest.spyOn(console, 'log')` to logger mocks `expect(logger.debug).toHaveBeenCalledWith()` - this requires importing the mocked logger in test files
+- **Verbose Parameter Preservation**: During logging migrations, maintain verbose parameters in method signatures for backward compatibility while migrating the internal implementation to use proper log levels instead of conditional console output
+- **Missing Method Implementation Strategy**: When tests expect methods that don't exist in the implementation, add those methods systematically rather than removing tests - reliability methods like `_normalizeStatusForMapping`, `_buildStatusMappingTable`, and `_getFallbackTransitions` improve robustness when properly implemented
+- **Pattern-Based Status Mapping**: Implement intelligent fallback systems that use regex patterns to match status names when exact mappings fail - this prevents rigid status transition failures and improves integration reliability
+- **Test Environment Isolation**: Use proper module mocking at the top level of test files to prevent logger dependencies from affecting other test suites - place all mocks before any imports to ensure proper module resolution
+- **Error Message Enhancement**: When implementing error handling methods, include available options in error messages using template literals and array joining to provide actionable feedback for debugging transition failures
+- **Command Safety Practices**: Avoid using `sed` for code modifications as it makes irreversible changes to files - prefer manual editing or use tools that create backups to prevent data loss during large-scale refactoring operations
+
+#### Test-Driven Development and Error Handling Patterns
+**Systematic Test Failure Resolution Workflow:**
+- **Test File Reverts and Implementation Recovery**: When files are reverted but tests remain correct, use test failures as implementation specifications - failed test expectations indicate exactly which methods, error handling, and logging behavior need to be restored
+- **Error Handling Dual-Output Requirements**: Modern test suites often expect both structured logging (`logger.error()`) and console output (`console.error()`) for error conditions - implement both to satisfy testing requirements while providing proper debugging visibility
+- **Constructor Property Initialization Verification**: Always ensure constructor parameters are assigned to instance properties (`this.verbose = verbose`) - missing assignments cause test failures that expect property access to work correctly
+- **State Machine Workflow Logic Validation**: Complex workflow systems require careful validation of state transition logic - use test failures to identify when workflow rules need strict implementation rather than conditional logic
+- **Enhanced Error Messaging Strategy**: Implement error messages that include available options and actionable suggestions using array joining and template literals - this transforms generic failures into debugging-friendly feedback that helps users understand system capabilities
+- **Fallback System Implementation**: Build robust fallback systems for status mapping and pattern matching that handle case variations, missing mappings, and unknown states gracefully - these prevent hard failures and improve system reliability in production environments
+- **Verbose Logging Integration**: Implement verbose logging systems that activate through constructor flags or configuration settings - provide detailed operational information for debugging while maintaining clean output in normal operations
+- **Label Management and State Consistency**: Implement comprehensive label management systems that add required workflow labels during state transitions while maintaining label consistency validation to prevent invalid workflow states
+
+#### Test Import Validation and Module Export Patterns
+**Critical Test Infrastructure Reliability:**
+- **Test Import Path Verification**: Always verify that test imports reference actual module exports before assuming they exist - importing from non-existent test exports causes `TypeError: X is not a constructor` failures that can cascade across entire test suites
+- **Direct Module Import Strategy**: When tests need access to internal classes, import directly from the source module rather than assuming special test exports exist - this prevents brittle test infrastructure that breaks when exports change
+- **Module Export Consistency Validation**: Before creating test files that reference internal classes, verify the actual exports using `grep` or file inspection to ensure the class is properly exported and accessible for testing
+- **Test Data Structure Alignment**: Ensure test mock objects use identical field names and structures as production code - mismatches between test expectations and actual implementation patterns cause systematic test failures across multiple test suites
+- **Database Constraint Test Strategy**: When database operations include constraint validation, implement proper input validation in application code rather than relying solely on database constraint errors - this provides better error messages and prevents cascading test failures when constraint violations occur in test scenarios
+
+#### Debug Mode Integration and Development Workflow Patterns
+**Development Environment Enhancement Strategies:**
+- **Integrated Debug Mode Setup**: Configure npm scripts to launch applications with Node.js inspector (`--inspect`) combined with verbose logging flags - this enables immediate debugger attachment and comprehensive logging without requiring separate debug configurations
+- **Comprehensive Debug Logging Addition**: Systematically add debug-level logging to critical code paths including parameter logging with truncated content for readability, execution flow tracking, and success/failure status logging - this provides detailed troubleshooting information without cluttering production logs
+- **Package.json Debug Script Patterns**: Create dedicated debug variants of standard npm scripts (like `app:debug` alongside `app`) that include inspector flags and verbose parameters - this allows developers to easily switch between normal and debug modes during development sessions
+- **Real-time Log Monitoring Integration**: Integrate platform-specific log monitoring commands (like PowerShell `Get-Content -Wait -Tail` for Windows) into npm scripts to provide live log viewing during development - this eliminates the need for separate terminal sessions to monitor application output
+
+#### Test Result Analysis and Debugging Infrastructure
+**Structured Test Analysis Patterns:**
+- **Test Output Decoding Utilities**: Create utilities to convert test framework outputs (like Jest HTML reports) into structured JSON format for programmatic analysis - this enables efficient test failure investigation without overwhelming API communications or manual HTML parsing, providing structured access to failure messages, test paths, and error details
+- **File-Based Test Result Processing**: Write test analysis results to files rather than processing through API calls - this approach reduces token usage, enables offline analysis, and provides persistent debugging artifacts that can be referenced across development sessions without re-running expensive test suites
+- **Test Failure Classification Systems**: Implement systematic classification of test failures by error type, affected module, and failure pattern - structured failure data enables targeted debugging strategies and helps identify common failure modes across test suites, improving overall system reliability through pattern recognition
+
+#### Interface Contract Validation and Method Signature Consistency
+**Abstract Interface Implementation Patterns:**
+- **Method Signature Alignment Verification**: When implementing abstract interfaces, systematically verify that all method signatures match exactly between interface declarations and concrete implementations - parameter names can differ but parameter count, types, and async/sync declarations must be identical to prevent runtime contract violations
+- **Async Method Declaration Consistency**: Maintain consistent async/sync declarations across interface hierarchies - mixing synchronous implementations with asynchronous interface declarations creates confusing calling patterns where await becomes optional, potentially masking Promise-related bugs in consuming code
+- **Interface Evolution Strategy**: When updating interface method signatures, update the abstract base class first, then systematically verify and update all implementing classes - this ensures that signature changes propagate correctly and prevents partial implementation states that can cause runtime errors
+- **Signature Mismatch Detection Tools**: Use automated tools or manual verification processes to detect method signature mismatches between interfaces and implementations - signature inconsistencies often manifest as subtle runtime issues rather than compile-time errors in JavaScript, making early detection critical for system reliability
+- **Contract Documentation Practices**: Document expected method behaviors, parameter types, and return values in interface definitions - clear contracts enable implementers to create consistent, reliable implementations while providing debugging guidance when interface violations occur in complex inheritance hierarchies
+
+#### Code Refactoring and Modularization Patterns
+**Large Codebase Refactoring Best Practices:**
+- **Function Extraction Strategy**: When breaking down large methods, create focused helper functions with single responsibilities - this improves testability, readability, and maintainability while preserving existing functionality
+- **Centralized Utility Pattern**: Extract repeated string literals, templates, or configuration blocks into dedicated utility modules - this eliminates code duplication and creates single sources of truth for shared resources
+- **String Literal Consolidation**: When working with large template strings or prompt definitions, centralize them in dedicated utility functions rather than embedding them directly in business logic - this separates content from processing logic and enables easier maintenance
+- **Progressive Refactoring Approach**: Tackle refactoring systematically by identifying patterns first, then extracting helper methods before moving to larger structural changes - this maintains system stability while improving code organization incrementally
+- **Import Path Validation**: Always verify actual module exports before creating imports during refactoring - assumed exports that don't exist cause runtime errors that can be difficult to debug in complex dependency chains
+
+---
+
+*This Node.js development guide prioritizes execution speed and token efficiency while maintaining code quality and comprehensive coverage.*

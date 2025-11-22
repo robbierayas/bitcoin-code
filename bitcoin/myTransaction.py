@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'cryptography')
 from datetime import datetime
 startTime = datetime.now()
 from bitcoin import myWallet
+from bitcoin.wallet import Wallet
 from cryptography import ripemd160_educational as myCrypto
 from cryptography.rollback import myRollBack
 from cryptography import base58Utils, keyUtils
@@ -18,8 +19,13 @@ print('')
 print('')
 print('MyTransaction: private key {}'.format(TestKeys.KEY3_HEX))
 print('')
-public_key = myWallet.createAddress(TestKeys.KEY3_HEX)
-print('MyTransaction: public_key calulated using Mywallet lib {}'.format(public_key))
+# Create wallet with KEY3_HEX
+wallet = Wallet(TestKeys.KEY3_HEX)
+# Get the keypair from wallet
+keypair = wallet.keypair
+# Get the public key from keypair
+public_key = keypair.publickey
+print('MyTransaction: public_key calculated using Wallet class {}'.format(public_key))
 print('public_key type {}'.format(type(public_key)))
 
 
@@ -40,8 +46,8 @@ print('')
 print('')
 print('')
 print('Method 1')
-pkHash10 = keyUtils.pubKeyToAddr(public_key)
-print('MyTransaction1: pkHash calulated using KeyUtils lib {}'.format(pkHash10))
+pkHash10 = wallet.get_address()
+print('MyTransaction1: pkHash calculated using Wallet.get_address() {}'.format(pkHash10))
 
 print('')
 print('')

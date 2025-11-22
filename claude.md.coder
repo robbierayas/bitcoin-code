@@ -1,0 +1,610 @@
+# Python Development Guide for Claude (Converted from Node.js)
+
+**Source Reference:** This guide is the Python equivalent of `bitcoin/node.txt` (Node.js guide)
+
+## Python Best Practices and Code Quality
+
+### Code Quality Standards
+- **Variables**: Use descriptive snake_case (`current_user`, `database_connection`)
+- **Constants**: Use UPPER_SNAKE_CASE for module-level constants (`MAX_CONNECTIONS`, `API_KEY`)
+- **Functions**: snake_case function names (`process_data`, `get_user_info`)
+- **Classes**: PascalCase class names (`DataProcessor`, `UserService`)
+- **Files**: snake_case for files, snake_case for directories (`user_service.py`, `data_processor/`)
+- **Private members**: Single underscore prefix (`_private_method`, `_internal_state`)
+
+### Async Patterns (Python async/await)
+```python
+# ✅ Preferred: async/await
+async def process_data(input_data):
+    try:
+        result = await data_service.process(input_data)
+        return result
+    except Exception as error:
+        print(f'Processing failed: {error}')
+        raise
+
+# ✅ Gathering multiple async operations
+import asyncio
+results = await asyncio.gather(*[process_item(item) for item in items])
+
+# ✅ Running async functions in sync context
+import asyncio
+result = asyncio.run(process_data(input_data))
+
+# ❌ Avoid blocking I/O in async functions
+async def bad_example():
+    time.sleep(1)  # WRONG - blocks event loop
+    # Use: await asyncio.sleep(1)
+```
+
+### Error Handling
+```python
+# ✅ Proper error handling
+try:
+    data = json.loads(json_string)
+    result = await process_data(data)
+    return result
+except json.JSONDecodeError as error:
+    print(f'JSON parsing failed: {error}')
+    raise
+except Exception as error:
+    print(f'Error processing data: {str(error)}')
+    raise ValueError(f'Data processing failed: {str(error)}')
+
+# ✅ Input validation
+def validate_input(data):
+    if not data or not isinstance(data, dict):
+        raise ValueError('Invalid input: expected dictionary')
+    return True
+
+# ✅ Custom exceptions
+class ProcessingError(Exception):
+    """Raised when data processing fails"""
+    pass
+```
+
+### Database Operations (Python DB-API Pattern)
+```python
+# ✅ Safe database queries with parameters (prevents SQL injection)
+cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+result = cursor.fetchall()
+
+# ✅ Transaction handling
+connection = sqlite3.connect('database.db')
+try:
+    cursor = connection.cursor()
+    cursor.execute('INSERT INTO...', params1)
+    cursor.execute('UPDATE...', params2)
+    connection.commit()
+except Exception as error:
+    connection.rollback()
+    raise
+finally:
+    if connection:
+        connection.close()
+
+# ✅ Context manager for automatic cleanup
+with sqlite3.connect('database.db') as conn:
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users')
+    results = cursor.fetchall()
+# Connection automatically closed
+```
+
+### Python-Specific Efficiency
+- Use `with` statements for resource management (files, connections)
+- Prefer list comprehensions over loops for transformations
+- Use generators for memory-efficient iteration over large datasets
+- Implement proper `__enter__` and `__exit__` for context managers
+- Use `pathlib.Path` instead of `os.path` for file operations
+- Prefer `f-strings` over `.format()` or `%` formatting
+
+### Memory Efficiency
+- Use generators (`yield`) for large data processing
+- Implement pagination for database queries
+- Close file handles and database connections properly
+- Use `__del__` carefully (prefer context managers)
+- Use `weakref` for circular reference management
+
+## Claude Performance and Search Strategy
+
+### ⚡ Efficient Search Strategy
+
+**PRINCIPLE: Assume files are named logically, search only when necessary**
+
+### Tool Selection Priority (Python Projects)
+1. **Read** tool for specific files (fastest)
+2. **Check likely files first** - assume logical naming
+3. **Grep** tool for text search (with rg backend)
+4. **Glob** tool for file pattern matching (`**/*.py`, `tests/**/*.py`)
+5. **Bash** tool only when others insufficient
+
+### Smart Search Strategy (Minimal Searching)
+1. **Assume logical naming** - `database.py` has database functions
+2. **Read likely files directly** - faster than searching
+3. **Simple patterns only**: `grep "class UserService"` not complex regex
+4. **Check module __init__.py**: Imports often reveal structure
+5. **Follow imports**: `from module import Class` shows file organization
+
+### Tool Usage for Claude (Python-specific)
+- **✅ Preferred**: Use Grep, Glob, Read tools for file operations
+- **✅ Python tools**: Use `grep "class "` to find class definitions
+- **⚡ Fast**: Use `rg` (ripgrep) if available - faster than grep
+- **❌ Avoid**: Don't use bash for simple file reads - use Read tool instead
+- **✅ Virtual environments**: Respect venv/virtualenv directories in searches
+
+## Architecture Patterns and Best Practices
+
+### Core Architecture Patterns
+- **ABC (Abstract Base Classes)**: Use `abc.ABC` for interface definitions
+- **Factory Pattern**: Factory classes for dependency injection
+- **Context Managers**: `__enter__` and `__exit__` for resource management
+- **Dataclasses**: Use `@dataclass` for simple data containers
+- **Type Hints**: Use `typing` module for type annotations
+- **Dependency Injection**: Constructor-based dependency injection
+- **Separation of Concerns**: Clean separation of business logic and data access
+
+### Factory Pattern Usage
+```python
+# ✅ Factory pattern for dependency creation
+from typing import Protocol
+
+class DatabaseProtocol(Protocol):
+    def query(self, sql: str, params: tuple) -> list: ...
+
+class DatabaseFactory:
+    @staticmethod
+    def create_database(config: dict) -> DatabaseProtocol:
+        if config['type'] == 'sqlite':
+            return SQLiteDatabase(config)
+        elif config['type'] == 'postgres':
+            return PostgresDatabase(config)
+        raise ValueError(f"Unknown database type: {config['type']}")
+
+# Usage
+db = DatabaseFactory.create_database(config)
+```
+
+### Dependency Injection Pattern
+```python
+class JobProcessor:
+    def __init__(self, database, external_service, config_manager, messaging_client):
+        self.database = database
+        self.service = CoreService(config_manager)
+        self.external_service = external_service
+        self.messaging_client = messaging_client
+
+    async def initialize(self):
+        """Initialize async resources"""
+        await self.service.initialize()
+
+# Usage
+processor = JobProcessor(
+    database=db,
+    external_service=api_client,
+    config_manager=config,
+    messaging_client=msg_client
+)
+await processor.initialize()
+```
+
+### Testing with Mocks (pytest & unittest)
+```python
+# pytest with mocks
+import pytest
+from unittest.mock import Mock, patch, MagicMock
+
+# Running tests
+# pytest                    # Run all tests
+# pytest -v                 # Verbose
+# pytest -k test_user       # Run tests matching pattern
+# pytest --watch            # Watch mode (requires pytest-watch)
+
+# Mock pattern with pytest
+@pytest.fixture
+def mock_database():
+    db = Mock()
+    db.query.return_value = [{'id': 1, 'name': 'Test'}]
+    return db
+
+def test_job_processing(mock_database):
+    job = JobClass(mock_database)
+    result = job.process()
+    assert result is not None
+    mock_database.query.assert_called_once()
+
+# unittest pattern
+import unittest
+
+class TestJobClass(unittest.TestCase):
+    def setUp(self):
+        self.mock_db = Mock()
+        self.job = JobClass(self.mock_db)
+
+    def test_process_data(self):
+        result = self.job.process()
+        self.assertIsNotNone(result)
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+## Advanced Development Patterns and Reliability
+
+### Abstract Base Classes (ABC) Pattern
+```python
+from abc import ABC, abstractmethod
+from typing import List, Optional
+
+class WorkflowServiceInterface(ABC):
+    """Abstract interface for workflow state management"""
+
+    @abstractmethod
+    def transition_state(self, item_id: str, new_state: str) -> bool:
+        """Transition item to new state"""
+        pass
+
+    @abstractmethod
+    def get_current_state(self, item_id: str) -> Optional[str]:
+        """Get current state of item"""
+        pass
+
+class WorkflowService(WorkflowServiceInterface):
+    """Concrete implementation"""
+
+    def __init__(self, database):
+        self.database = database
+
+    def transition_state(self, item_id: str, new_state: str) -> bool:
+        # Implementation
+        return True
+
+    def get_current_state(self, item_id: str) -> Optional[str]:
+        # Implementation
+        return "pending"
+```
+
+### State Machine and Integration Reliability Patterns
+
+#### State Machine Reliability Best Practices
+**Critical Reliability Patterns:**
+- **Normalized State Comparisons**: Use `.lower().strip()` for state comparisons
+- **Enum-based States**: Use `enum.Enum` for state definitions to prevent typos
+- **Type Hints**: Use type hints to catch state-related errors at development time
+- **Validation Functions**: Implement state validation functions before transitions
+
+```python
+from enum import Enum
+from typing import Optional
+
+class WorkflowState(Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+    @classmethod
+    def from_string(cls, value: str) -> Optional['WorkflowState']:
+        """Normalize and convert string to enum"""
+        normalized = value.lower().strip()
+        for state in cls:
+            if state.value == normalized:
+                return state
+        return None
+
+def transition_state(current: WorkflowState, target: WorkflowState) -> bool:
+    """Validate and perform state transition"""
+    valid_transitions = {
+        WorkflowState.PENDING: [WorkflowState.IN_PROGRESS, WorkflowState.FAILED],
+        WorkflowState.IN_PROGRESS: [WorkflowState.COMPLETED, WorkflowState.FAILED],
+        WorkflowState.COMPLETED: [],
+        WorkflowState.FAILED: [WorkflowState.PENDING]
+    }
+
+    if target not in valid_transitions[current]:
+        raise ValueError(f"Invalid transition: {current} -> {target}")
+
+    return True
+```
+
+#### Database Method Consistency Patterns
+**Interface Method Alignment:**
+- **Protocol Usage**: Use `typing.Protocol` for structural typing (Python 3.8+)
+- **Method Signature Validation**: Ensure implementations match protocol signatures exactly
+- **Type Checking**: Use `mypy` or `pyright` for static type checking
+
+```python
+from typing import Protocol, List, Tuple
+
+class DatabaseProtocol(Protocol):
+    """Protocol defining database interface"""
+
+    def execute(self, query: str, params: Tuple) -> None:
+        """Execute query without returning results"""
+        ...
+
+    def fetchall(self, query: str, params: Tuple) -> List[dict]:
+        """Execute query and return all results"""
+        ...
+
+    def fetchone(self, query: str, params: Tuple) -> dict:
+        """Execute query and return one result"""
+        ...
+```
+
+#### Windows Development Reliability Patterns
+**File System Handling:**
+- **Path Handling**: Always use `pathlib.Path` for cross-platform compatibility
+- **File Locking**: Use `filelock` library for reliable file locking on Windows
+- **Temp Files**: Use `tempfile` module for cross-platform temp file handling
+
+```python
+from pathlib import Path
+import tempfile
+from filelock import FileLock
+
+# ✅ Cross-platform path handling
+project_root = Path(__file__).parent.parent
+data_file = project_root / "data" / "users.db"
+
+# ✅ Safe temp file handling
+with tempfile.TemporaryDirectory() as tmp_dir:
+    tmp_path = Path(tmp_dir) / "test.db"
+    # Use tmp_path
+
+# ✅ File locking for Windows compatibility
+lock_file = data_file.with_suffix('.lock')
+with FileLock(str(lock_file)):
+    # Safe file operations
+    with open(data_file, 'r') as f:
+        data = f.read()
+```
+
+### Configuration and Testing Reliability Patterns
+
+#### Configuration Management Patterns
+**Configuration System Reliability:**
+- **Config Files**: Use `configparser`, `json`, `yaml`, or `toml` for configuration
+- **Environment Variables**: Use `python-dotenv` for `.env` file support
+- **Default Values**: Use `dict.get()` with defaults or dataclasses with defaults
+- **Type Safety**: Use Pydantic for validated configuration models
+
+```python
+from dataclasses import dataclass, field
+from typing import Optional
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load .env file
+
+@dataclass
+class DatabaseConfig:
+    host: str = field(default_factory=lambda: os.getenv('DB_HOST', 'localhost'))
+    port: int = field(default_factory=lambda: int(os.getenv('DB_PORT', '5432')))
+    name: str = field(default_factory=lambda: os.getenv('DB_NAME', 'mydb'))
+
+    @classmethod
+    def from_env(cls) -> 'DatabaseConfig':
+        return cls()
+
+# With Pydantic (recommended for validation)
+from pydantic import BaseSettings, Field
+
+class AppConfig(BaseSettings):
+    database_url: str = Field(default="sqlite:///app.db", env="DATABASE_URL")
+    log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    max_connections: int = Field(default=10, env="MAX_CONNECTIONS")
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+config = AppConfig()
+```
+
+#### Logging Integration Patterns
+**Python Logging Best Practices:**
+- **Use logging module**: Never use `print()` for production logging
+- **Logger Hierarchy**: Use `logger = logging.getLogger(__name__)` for module loggers
+- **Configuration**: Configure logging once at application entry point
+
+```python
+import logging
+import logging.config
+
+# ✅ Module-level logger
+logger = logging.getLogger(__name__)
+
+# ✅ Logging configuration
+LOGGING_CONFIG = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+            'level': 'DEBUG',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': 'app.log',
+            'formatter': 'standard',
+            'level': 'INFO',
+        },
+    },
+    'loggers': {
+        '': {  # Root logger
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+        },
+    },
+}
+
+# Configure at app startup
+logging.config.dictConfig(LOGGING_CONFIG)
+
+# ✅ Usage in code
+logger.debug("Processing item: %s", item_id)
+logger.info("Transaction completed successfully")
+logger.warning("Retry attempt %d of %d", attempt, max_attempts)
+logger.error("Failed to process: %s", error, exc_info=True)
+```
+
+### Advanced Testing and Development Patterns
+
+#### Database Migration and Testing Patterns
+**Mock Patterns for Database Testing:**
+```python
+import pytest
+from unittest.mock import Mock, patch, MagicMock
+
+@pytest.fixture
+def mock_database():
+    """Mock database for testing"""
+    db = Mock()
+    # Synchronous return values
+    db.fetchall.return_value = []
+    db.fetchone.return_value = None
+    db.execute.return_value = None
+    return db
+
+@pytest.fixture
+def mock_database_with_data():
+    """Mock database with test data"""
+    db = Mock()
+    db.fetchall.return_value = [
+        {'id': 1, 'name': 'User 1'},
+        {'id': 2, 'name': 'User 2'},
+    ]
+    db.fetchone.return_value = {'id': 1, 'name': 'User 1'}
+    return db
+
+def test_user_service(mock_database_with_data):
+    service = UserService(mock_database_with_data)
+    users = service.get_all_users()
+
+    assert len(users) == 2
+    mock_database_with_data.fetchall.assert_called_once()
+
+# ✅ Testing with exceptions
+def test_error_handling(mock_database):
+    mock_database.execute.side_effect = sqlite3.IntegrityError("Duplicate key")
+
+    service = UserService(mock_database)
+    with pytest.raises(ValueError, match="User already exists"):
+        service.create_user("duplicate@example.com")
+```
+
+#### Type Hints and Modern Python Features
+**Type System Best Practices:**
+```python
+from typing import List, Dict, Optional, Union, Callable, TypeVar, Generic
+from typing import Protocol, runtime_checkable
+from dataclasses import dataclass
+
+# ✅ Function type hints
+def process_users(
+    users: List[Dict[str, str]],
+    filter_func: Optional[Callable[[Dict], bool]] = None
+) -> List[str]:
+    """Process users and return list of names"""
+    filtered = users if filter_func is None else [u for u in users if filter_func(u)]
+    return [user['name'] for user in filtered]
+
+# ✅ Generic types
+T = TypeVar('T')
+
+class Repository(Generic[T]):
+    def __init__(self, item_type: type[T]):
+        self.item_type = item_type
+        self._items: List[T] = []
+
+    def add(self, item: T) -> None:
+        self._items.append(item)
+
+    def get_all(self) -> List[T]:
+        return self._items.copy()
+
+# ✅ Protocol for duck typing
+@runtime_checkable
+class Serializable(Protocol):
+    def to_dict(self) -> Dict: ...
+    def from_dict(self, data: Dict) -> None: ...
+
+# ✅ Dataclass with defaults
+@dataclass
+class User:
+    name: str
+    email: str
+    age: Optional[int] = None
+    is_active: bool = True
+
+    def __post_init__(self):
+        """Validation after initialization"""
+        if '@' not in self.email:
+            raise ValueError("Invalid email address")
+```
+
+#### Code Organization and Module Structure
+**Python Project Structure:**
+```
+project/
+├── src/
+│   ├── __init__.py
+│   ├── main.py              # Entry point
+│   ├── models/              # Data models
+│   │   ├── __init__.py
+│   │   ├── user.py
+│   │   └── transaction.py
+│   ├── services/            # Business logic
+│   │   ├── __init__.py
+│   │   ├── user_service.py
+│   │   └── workflow_service.py
+│   ├── repositories/        # Data access
+│   │   ├── __init__.py
+│   │   └── user_repository.py
+│   └── utils/               # Utilities
+│       ├── __init__.py
+│       ├── config.py
+│       └── logger.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_user_service.py
+│   ├── test_workflow.py
+│   └── conftest.py          # pytest fixtures
+├── requirements.txt          # Production dependencies
+├── requirements-dev.txt      # Development dependencies
+├── setup.py or pyproject.toml
+└── README.md
+```
+
+## Conversion Summary: Node.js → Python
+
+| Concept | Node.js | Python |
+|---------|---------|--------|
+| Naming | camelCase | snake_case |
+| Constants | UPPER_SNAKE_CASE | UPPER_SNAKE_CASE |
+| Classes | PascalCase | PascalCase |
+| Async | `async/await` | `async/await` |
+| Promises | `Promise.all()` | `asyncio.gather()` |
+| Error Handling | `try/catch` | `try/except` |
+| Null | `null/undefined` | `None` |
+| Nullish Coalescing | `??` | `or` (careful!) / `if x is None` |
+| Interfaces | TypeScript interfaces | `Protocol` / `ABC` |
+| Private Members | `#field` or `_field` | `_field` (convention) |
+| Package Manager | npm | pip / poetry |
+| Config File | `package.json` | `requirements.txt` / `pyproject.toml` |
+| Testing | Jest | pytest / unittest |
+| Mocking | Jest mocks | unittest.mock / pytest-mock |
+| Logging | console.log / winston | logging module |
+| DB Callbacks | callback pattern | sync or async/await |
+| Type Checking | TypeScript | mypy / pyright |
+
+---
+
+*This Python development guide is translated from the Node.js guide (`bitcoin/node.txt`) and prioritizes execution speed, token efficiency, and Pythonic code quality.*

@@ -43,8 +43,55 @@ payload = base58Utils.base58CheckDecode(address)
 
 **Used by:** keyUtils for WIF and address encoding
 
+### keypair.py ✓ (NEW - OBJECT ORIENTED)
+**Bitcoin ECDSA KeyPair class**
+
+Object-oriented key management with public/private key encapsulation.
+
+**Class: KeyPair**
+- `publickey` - Public attribute (hex string)
+- `_privatekey` - Private attribute (hex string)
+- Constructor takes private key hex
+
+**Tests:** cryptography/tests/test_keypair.py (24 tests)
+
+**Main usage:**
+```python
+from cryptography.keypair import KeyPair
+
+# Create from private key
+keypair = KeyPair(private_key_hex)
+
+# Access public key (public attribute)
+pub = keypair.publickey
+
+# Get private key (read-only method)
+priv = keypair.get_private_key()
+
+# Generate address
+address = keypair.get_address()
+
+# WIF conversion
+wif = keypair.to_wif()
+keypair = KeyPair.from_wif(wif)
+
+# Generate random keypair
+keypair = KeyPair.generate()
+
+# Sign and verify
+signature = keypair.sign(message_hash)
+is_valid = keypair.verify(message_hash, signature)
+```
+
+**Uses:** ECDSA secp256k1, SHA-256, RIPEMD-160, base58Utils
+
+**Dependencies:** base58Utils
+
 ### keyUtils.py ✓
-**ECDSA key management and Bitcoin address generation**
+**ECDSA key management functions (legacy API)**
+
+Function-based API maintained for backward compatibility.
+**Now uses KeyPair class internally.**
 
 - Private key ↔ WIF (Wallet Import Format) conversion
 - ECDSA key pair generation (secp256k1)
@@ -73,9 +120,11 @@ hex_sig = keyUtils.derSigToHexSig(der_signature)
 script = keyUtils.addrHashToScriptPubKey(address)
 ```
 
-**Uses:** ECDSA secp256k1, SHA-256, RIPEMD-160, base58Utils.base58CheckEncode
+**Note:** For new code, prefer using KeyPair class for better OOP design.
 
-**Dependencies:** base58Utils (for WIF and address encoding)
+**Uses:** KeyPair class, ECDSA secp256k1, SHA-256, RIPEMD-160
+
+**Dependencies:** keypair, base58Utils
 
 ### ripemd160.py ✓ (USE THIS ONE)
 **Clean, well-documented RIPEMD-160 implementation**
@@ -165,7 +214,7 @@ python test_ripemd160.py     # 15 tests - RIPEMD-160 algorithm
 - Deterministic behavior
 - Utility functions (makehex, makebin, ROL, little_end)
 
-**Total:** 35 tests pass ✓ (11 base58 + 9 keyUtils + 15 RIPEMD-160)
+**Total:** 59 tests pass ✓ (11 base58 + 24 keypair + 9 keyUtils + 15 RIPEMD-160)
 
 ## Usage
 
@@ -205,7 +254,8 @@ print("Hash160:", ripemd_hash)
 | File | Lines | Status | Tests | Use Case |
 |------|-------|--------|-------|----------|
 | base58Utils.py | ~100 | ✓ Working | 11/11 | **Production** |
-| keyUtils.py | ~50 | ✓ Working | 9/9 | **Production** |
+| keypair.py | ~200 | ✓ Working | 24/24 | **Production (OOP)** |
+| keyUtils.py | ~120 | ✓ Working | 9/9 | **Production (Legacy)** |
 | ripemd160.py | ~280 | ✓ Working | 15/15 | **Production** |
 | ripemd160_educational.py | ~301 | Educational | N/A | Learning |
 | ripemd160_backup.py | ~301 | Archive | N/A | Reference |
