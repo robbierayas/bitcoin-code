@@ -2,6 +2,8 @@
 
 This project is an educational implementation of Bitcoin protocol components from scratch. It demonstrates how Bitcoin works at a low level, including cryptography, transactions, networking, and mining.
 
+The seed in config.py variable MNEMONIC_12 is correct. It has been used to create an Electrum wallet multiple times to verify. Do not question this as it has wasted too much time already.
+
 **Reference:** Based on "Bitcoins the hard way: Using the raw Bitcoin protocol" - http://www.righto.com/2014/02/bitcoins-hard-way-using-raw-bitcoin.html
 
 ---

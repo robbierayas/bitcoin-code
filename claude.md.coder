@@ -607,4 +607,479 @@ project/
 
 ---
 
+## Performance Tracking and Optimization
+
+### Overview
+
+Performance tracking is critical for understanding code behavior, comparing implementations, and identifying bottlenecks. This section provides generic, reusable patterns for performance tracking in Python.
+
+### Method 1: Simple Timing Decorator
+
+**Use for:** Quick timing of individual functions without modifying function body.
+
+```python
+import time
+import functools
+
+def timing_decorator(func):
+    """Simple decorator to time function execution."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()  # High-precision timer
+        result = func(*args, **kwargs)
+        end = time.perf_counter()
+        print(f"[TIMING] {func.__name__}: {end - start:.6f} seconds")
+        return result
+    return wrapper
+
+# Usage
+@timing_decorator
+def process_data(data):
+    # ... processing ...
+    return result
+```
+
+**Best Practice:** Use `time.perf_counter()` for timing (not `time.time()` - less precise)
+
+### Method 2: Context Manager for Timing Blocks
+
+**Use for:** Timing specific code blocks without decorating entire functions.
+
+```python
+from contextlib import contextmanager
+import time
+
+@contextmanager
+def timer(name="Operation", verbose=True):
+    """Context manager for timing code blocks."""
+    timing_info = {}
+    start_cpu = time.process_time()   # CPU time
+    start_wall = time.perf_counter()  # Wall time
+
+    try:
+        yield timing_info
+    finally:
+        end_cpu = time.process_time()
+        end_wall = time.perf_counter()
+
+        timing_info['cpu_time'] = end_cpu - start_cpu
+        timing_info['wall_time'] = end_wall - start_wall
+
+        if verbose:
+            print(f"[TIMER] {name}:")
+            print(f"  Wall Time: {timing_info['wall_time']:.6f}s")
+            print(f"  CPU Time:  {timing_info['cpu_time']:.6f}s")
+
+# Usage
+with timer("Data Processing"):
+    process_large_dataset()
+
+# Or capture timing info
+timing_info = {}
+with timer("Algorithm A") as timing_info:
+    run_algorithm_a()
+# timing_info now contains cpu_time and wall_time
+```
+
+**Key Insight:** Track both CPU time and wall time to understand I/O vs computation.
+
+### Method 3: PerformanceTracker Class for Comparing Methods
+
+**Use for:** Comparing multiple implementations, running repeated tests, statistical analysis.
+
+```python
+import time
+from statistics import mean, median, stdev
+from typing import Callable, Dict, List
+
+class PerformanceTracker:
+    """Track and compare performance of multiple methods."""
+
+    def __init__(self, warmup_runs=0, repeat_runs=1):
+        self.warmup_runs = warmup_runs
+        self.repeat_runs = repeat_runs
+        self.results: Dict[str, List[float]] = {}
+
+    def track(self, name: str, func: Callable, *args, **kwargs):
+        """Track performance of a function."""
+        if name not in self.results:
+            self.results[name] = []
+
+        # Warmup runs (to stabilize caching, JIT, etc.)
+        for _ in range(self.warmup_runs):
+            func(*args, **kwargs)
+
+        # Actual timed runs
+        result = None
+        for _ in range(self.repeat_runs):
+            start = time.perf_counter()
+            result = func(*args, **kwargs)
+            end = time.perf_counter()
+            self.results[name].append(end - start)
+
+        return result
+
+    def print_comparison(self):
+        """Print comparison table of all tracked methods."""
+        if not self.results:
+            return
+
+        print("\n" + "=" * 70)
+        print("PERFORMANCE COMPARISON")
+        print("=" * 70)
+        print(f"{'Method':<20} {'Avg (s)':<12} {'Min (s)':<12} {'Max (s)':<12}")
+        print("-" * 70)
+
+        # Sort by average time
+        sorted_methods = sorted(
+            self.results.items(),
+            key=lambda x: mean(x[1])
+        )
+
+        fastest_time = mean(sorted_methods[0][1])
+
+        for name, times in sorted_methods:
+            avg = mean(times)
+            speedup = avg / fastest_time
+
+            print(f"{name:<20} {avg:<12.6f} {min(times):<12.6f} {max(times):<12.6f}", end='')
+            if speedup > 1.0:
+                print(f" ({speedup:.2f}x slower)")
+            else:
+                print(" (fastest)")
+
+        print("=" * 70)
+
+    def get_stats(self, name: str) -> Dict:
+        """Get statistical summary for a method."""
+        if name not in self.results or not self.results[name]:
+            return {}
+
+        times = self.results[name]
+        stats = {
+            'mean': mean(times),
+            'median': median(times),
+            'min': min(times),
+            'max': max(times),
+        }
+        if len(times) > 1:
+            stats['stdev'] = stdev(times)
+        return stats
+
+# Usage
+tracker = PerformanceTracker(warmup_runs=2, repeat_runs=5)
+
+tracker.track('Method A', method_a, data)
+tracker.track('Method B', method_b, data)
+tracker.track('Method C', method_c, data)
+
+tracker.print_comparison()
+
+# Get detailed stats
+stats_a = tracker.get_stats('Method A')
+print(f"Method A average: {stats_a['mean']:.6f}s")
+```
+
+**Best Practices:**
+- Use warmup runs (1-3) to stabilize caching effects
+- Use repeat runs (3-10) for statistical significance
+- Always compare relative performance, not absolute times
+
+### Method 4: Memory Tracking
+
+**Use for:** Identifying memory leaks, understanding memory usage patterns.
+
+**Requires:** `pip install psutil`
+
+```python
+import psutil
+from contextmanager import contextmanager
+
+def get_memory_usage():
+    """Get current memory usage."""
+    process = psutil.Process()
+    mem_info = process.memory_info()
+    return {
+        'rss_mb': mem_info.rss / 1024 / 1024,  # Resident Set Size
+        'vms_mb': mem_info.vms / 1024 / 1024,  # Virtual Memory Size
+    }
+
+@contextmanager
+def memory_tracker(name="Operation"):
+    """Track memory usage of a code block."""
+    process = psutil.Process()
+    mem_before = process.memory_info()
+
+    try:
+        yield
+    finally:
+        mem_after = process.memory_info()
+        rss_diff = (mem_after.rss - mem_before.rss) / 1024 / 1024
+        vms_diff = (mem_after.vms - mem_before.vms) / 1024 / 1024
+
+        print(f"[MEMORY] {name}:")
+        print(f"  RSS Change: {rss_diff:+.2f} MB")
+        print(f"  Current RSS: {mem_after.rss / 1024 / 1024:.2f} MB")
+
+# Usage
+with memory_tracker("Large Dataset Processing"):
+    process_large_dataset()
+```
+
+### Method 5: Progress Tracking for Long-Running Operations
+
+**Use for:** Operations that may not complete, need monitoring, or can be interrupted.
+
+```python
+import signal
+
+class LongRunningOperation:
+    """Framework for interruptible long-running operations."""
+
+    def __init__(self, max_iterations=None, progress_interval=1000):
+        self.max_iterations = max_iterations
+        self.progress_interval = progress_interval
+        self.interrupted = False
+
+        # Stats tracking
+        self.stats = {
+            'iterations': 0,
+            'items_processed': 0,
+            'stopped_early': False,
+            'stop_reason': None,
+        }
+
+    def should_stop(self):
+        """Check if we should stop."""
+        if self.interrupted:
+            self.stats['stopped_early'] = True
+            self.stats['stop_reason'] = 'interrupted'
+            return True
+
+        if self.max_iterations and self.stats['iterations'] >= self.max_iterations:
+            self.stats['stopped_early'] = True
+            self.stats['stop_reason'] = 'max_iterations'
+            return True
+
+        return False
+
+    def report_progress(self):
+        """Report progress if at interval."""
+        if self.stats['iterations'] % self.progress_interval == 0:
+            print(f"[Progress] Iterations: {self.stats['iterations']:,}, "
+                  f"Processed: {self.stats['items_processed']:,}")
+
+    def run(self):
+        """Run the operation with progress tracking."""
+        # Setup Ctrl+C handler
+        def signal_handler(sig, frame):
+            print("\n[!] Interrupted by user (Ctrl+C)")
+            print("Stopping gracefully...\n")
+            self.interrupted = True
+
+        old_handler = signal.signal(signal.SIGINT, signal_handler)
+
+        try:
+            while not self.should_stop():
+                # Do work
+                self.do_iteration()
+
+                # Track progress
+                self.stats['iterations'] += 1
+                self.report_progress()
+
+        finally:
+            # Restore old handler
+            signal.signal(signal.SIGINT, old_handler)
+
+            # Print final stats
+            self.print_stats()
+
+        return self.stats
+
+    def do_iteration(self):
+        """Override this with actual work."""
+        pass
+
+    def print_stats(self):
+        """Print current statistics."""
+        print("\n" + "=" * 70)
+        print("STATISTICS")
+        print("=" * 70)
+        print(f"Iterations:       {self.stats['iterations']:,}")
+        print(f"Items Processed:  {self.stats['items_processed']:,}")
+
+        if self.stats['stopped_early']:
+            print(f"Stopped Early:    Yes ({self.stats['stop_reason']})")
+
+        if self.max_iterations:
+            pct = (self.stats['iterations'] / self.max_iterations) * 100
+            print(f"Progress:         {pct:.1f}%")
+
+        print("=" * 70)
+
+# Usage
+class MyOperation(LongRunningOperation):
+    def do_iteration(self):
+        # Your actual work here
+        process_item()
+        self.stats['items_processed'] += 1
+
+op = MyOperation(max_iterations=10000, progress_interval=500)
+result = op.run()
+# Press Ctrl+C anytime to stop gracefully and see stats
+```
+
+### Method 6: Profiling (Advanced)
+
+**Use for:** Detailed analysis of where time is spent in your code.
+
+```python
+import cProfile
+import pstats
+from pstats import SortKey
+
+def profile_function(func):
+    """Profile a function and print stats."""
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    result = func()
+
+    profiler.disable()
+    stats = pstats.Stats(profiler)
+    stats.sort_stats(SortKey.CUMULATIVE)
+    stats.print_stats(20)  # Top 20 functions
+
+    return result
+
+# Usage
+def my_function():
+    # ... complex code ...
+    pass
+
+result = profile_function(my_function)
+```
+
+**Alternative:** Use `line_profiler` for line-by-line profiling.
+
+```bash
+pip install line_profiler
+# Add @profile decorator to functions
+# Run: kernprof -l -v script.py
+```
+
+### Generic Performance Tracking Pattern
+
+**Complete template for any project:**
+
+```python
+"""performance.py - Generic performance tracking module."""
+
+import time
+import functools
+from contextlib import contextmanager
+from typing import Callable, Dict, List
+from statistics import mean, median, stdev
+
+# 1. Simple timing decorator
+def timing_decorator(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        end = time.perf_counter()
+        print(f"[TIMING] {func.__name__}: {end - start:.6f}s")
+        return result
+    return wrapper
+
+# 2. Context manager for timing
+@contextmanager
+def timer(name="Operation"):
+    timing_info = {}
+    start = time.perf_counter()
+    try:
+        yield timing_info
+    finally:
+        timing_info['time'] = time.perf_counter() - start
+        print(f"[TIMER] {name}: {timing_info['time']:.6f}s")
+
+# 3. Performance tracker
+class PerformanceTracker:
+    def __init__(self, warmup_runs=0, repeat_runs=1):
+        self.warmup_runs = warmup_runs
+        self.repeat_runs = repeat_runs
+        self.results = {}
+
+    def track(self, name, func, *args, **kwargs):
+        if name not in self.results:
+            self.results[name] = []
+
+        for _ in range(self.warmup_runs):
+            func(*args, **kwargs)
+
+        result = None
+        for _ in range(self.repeat_runs):
+            start = time.perf_counter()
+            result = func(*args, **kwargs)
+            self.results[name].append(time.perf_counter() - start)
+
+        return result
+
+    def print_comparison(self):
+        if not self.results:
+            return
+
+        print(f"\n{'Method':<20} {'Avg (s)':<12} {'Min (s)':<12}")
+        print("-" * 50)
+
+        sorted_methods = sorted(
+            self.results.items(),
+            key=lambda x: mean(x[1])
+        )
+
+        for name, times in sorted_methods:
+            print(f"{name:<20} {mean(times):<12.6f} {min(times):<12.6f}")
+
+# 4. Convenience comparison function
+def compare_methods(methods: Dict[str, Callable], **tracker_kwargs):
+    """Quick comparison of multiple methods."""
+    tracker = PerformanceTracker(**tracker_kwargs)
+
+    for name, func in methods.items():
+        tracker.track(name, func)
+
+    tracker.print_comparison()
+    return tracker
+
+# Usage in any project:
+# from performance import timing_decorator, timer, compare_methods
+```
+
+### Best Practices Summary
+
+1. **Use decorators** for non-intrusive function-level timing
+2. **Use context managers** for timing specific code blocks
+3. **Use PerformanceTracker** for comparing multiple implementations
+4. **Track both CPU and wall time** to understand I/O vs computation
+5. **Use warmup runs (1-3)** to stabilize caching effects
+6. **Use repeat runs (3-10)** for statistical significance
+7. **Always use `time.perf_counter()`** (not `time.time()`)
+8. **Compare relative performance**, not absolute times
+9. **Save results to JSON** for later analysis
+10. **Support graceful interruption (Ctrl+C)** for long-running operations
+
+### Performance Tracking Checklist
+
+- [ ] Simple timing needs? → Use `timing_decorator`
+- [ ] Time specific blocks? → Use `timer` context manager
+- [ ] Compare implementations? → Use `PerformanceTracker`
+- [ ] Long-running operation? → Add progress tracking + Ctrl+C handling
+- [ ] Memory concerns? → Use `memory_tracker` (requires psutil)
+- [ ] Detailed analysis? → Use `cProfile` or `line_profiler`
+- [ ] Need statistics? → Track mean, median, min, max, stdev
+- [ ] Production use? → Save metrics to database/files for monitoring
+
+---
+
 *This Python development guide is translated from the Node.js guide (`bitcoin/node.txt`) and prioritizes execution speed, token efficiency, and Pythonic code quality.*

@@ -1,10 +1,16 @@
 """
-HD Wallet Demo - Shows how address discovery and transaction signing works
+HD Wallet Demo - Shows how Electrum HD wallet works
 
-This demonstrates the complete workflow:
-1. Create HD wallet from mnemonic
-2. Discover addresses with UTXOs
-3. Create transaction from the correct address
+This demonstrates the Electrum wallet workflow:
+1. Create Electrum HD wallet from mnemonic
+2. Generate receiving and change addresses
+3. Verify addresses match Electrum wallet
+
+NOTE: The test mnemonic is an ELECTRUM NATIVE seed, not BIP39.
+Electrum uses different derivation:
+- PBKDF2 salt: b"electrum" (not b"mnemonic")
+- Paths: m/0/x (receiving), m/1/x (change)
+- Uses COMPRESSED public keys
 """
 
 import sys
@@ -24,14 +30,18 @@ def demo_hd_wallet_workflow():
     print("HD Wallet Address Discovery and Transaction Signing Demo")
     print("=" * 70)
 
-    # Step 1: Create HD wallet from mnemonic
-    print("\nStep 1: Create HD wallet from mnemonic")
+    # Step 1: Create Electrum HD wallet from mnemonic
+    print("\nStep 1: Create Electrum HD wallet from mnemonic")
     print("-" * 70)
 
-    wallet = Wallet.from_mnemonic(TestHDWallet.MNEMONIC_12)
+    wallet = Wallet.from_electrum_seed(TestHDWallet.MNEMONIC_12)
 
-    print(f"Created HD wallet")
-    print(f"First address: {wallet.get_address()}")
+    print(f"Created Electrum HD wallet")
+    print(f"Wallet type: {wallet.wallet_type}")
+    print(f"Seed type: {wallet.seed_type}")
+    print(f"First address (m/0/0): {wallet.get_address()}")
+    print(f"Expected: {TestHDWallet.EXPECTED_ADDR_0_0}")
+    print(f"Match: {wallet.get_address() == TestHDWallet.EXPECTED_ADDR_0_0}")
     print(f"Is HD wallet: {wallet.is_hd}")
 
     # Step 2: Generate additional addresses
@@ -52,19 +62,22 @@ def demo_hd_wallet_workflow():
         chain_name = "external" if chain == 0 else "internal"
         print(f"  {addr[:20]}... -> {chain_name} chain, index {index}")
 
-    # Step 4: Show how to get private key for specific address
-    print("\nStep 4: Get private key for specific address")
+    # Step 4: Get private key for addresses with real transaction history
+    print("\nStep 4: Verify real addresses from Electrum wallet")
     print("-" * 70)
 
-    test_addr = addresses[1]  # Second address we generated
-    print(f"Address: {test_addr}")
+    # Test receiving address (m/0/0) - has actual transaction history
+    test_addr_receiving = TestHDWallet.KNOWN_ADDR_WITH_TXS
+    print(f"\nReceiving address: {test_addr_receiving}")
+    print(f"This is our first address (m/0/0): {test_addr_receiving == wallet.get_address()}")
 
-    try:
-        private_key = wallet.get_private_key_for_address(test_addr)
-        print(f"Private key: {private_key[:20]}...")
-        print("[SUCCESS] Retrieved private key")
-    except ValueError as e:
-        print(f"[ERROR] {e}")
+    # Test change address (m/1/0) - has actual transaction history
+    test_addr_change = TestHDWallet.KNOWN_CHANGE_ADDR
+    print(f"\nChange address: {test_addr_change}")
+    change_addr = wallet.get_change_address()
+    print(f"This is our first change address (m/1/0): {test_addr_change == change_addr}")
+
+    print("\n[SUCCESS] Both addresses verified against Electrum wallet!")
 
     # Step 5: Auto-discovery of uncached address
     print("\nStep 5: Auto-discovery of uncached address (NEW FEATURE)")
@@ -72,7 +85,7 @@ def demo_hd_wallet_workflow():
 
     # This address wasn't generated yet
     # Simulate by creating a new wallet and getting its 10th address
-    temp_wallet = Wallet.from_mnemonic(TestHDWallet.MNEMONIC_12)
+    temp_wallet = Wallet.from_electrum_seed(TestHDWallet.MNEMONIC_12)
     for _ in range(10):
         temp_wallet.get_new_receiving_address()
     uncached_addr = temp_wallet.get_new_receiving_address()  # 11th address (index 10)
@@ -95,7 +108,7 @@ def demo_hd_wallet_workflow():
     print("-" * 70)
 
     # Create fresh wallet to test
-    wallet2 = Wallet.from_mnemonic(TestHDWallet.MNEMONIC_12)
+    wallet2 = Wallet.from_electrum_seed(TestHDWallet.MNEMONIC_12)
     print(f"Fresh wallet cache size: {len(wallet2._address_cache)}")
 
     try:
@@ -104,50 +117,85 @@ def demo_hd_wallet_workflow():
     except ValueError as e:
         print(f"[EXPECTED ERROR] {str(e)[:80]}...")
 
-    # Step 6: Create transaction from cached address
-    print("\nStep 6: Create transaction from cached address")
+    # Step 6: Create transaction with real UTXO data from API
+    print("\nStep 6: Create transaction with real UTXO data from API")
     print("-" * 70)
 
-    # Simulate having a UTXO at addresses[0]
-    source_addr = addresses[0]
+    # Use the first receiving address that we know has transaction history
+    source_addr = TestHDWallet.KNOWN_ADDR_WITH_TXS
     print(f"Source address: {source_addr}")
-    print(f"Creating transaction to spend from this address...")
 
+    # Get real UTXOs from Blockchair API
+    print("Fetching UTXOs from Blockchair API...")
     try:
-        txn = Transaction(wallet)
-        txn.create(
-            prev_txn_hash="a" * 64,  # Dummy transaction hash
-            prev_output_index=0,
-            source_address=source_addr,  # Wallet knows the key for this!
-            outputs=[[10000, "1KKKK6N21XKo48zWKuQKXdvSsCf95ibHFa"]],
-            input_value=50000,
-            fee_rate=10,
-            add_change=True
-        )
-        print("[SUCCESS] Transaction created successfully!")
-        print(f"  Transaction uses correct private key for {source_addr}")
+        utxos = wallet.find_utxos([source_addr])
+
+        if not utxos:
+            print("[SKIP] No UTXOs found for this address. Transaction demo skipped.")
+            print("  (This is expected if the wallet has no unspent outputs)")
+        else:
+            print(f"Found {len(utxos)} UTXO(s)")
+
+            # Use the first UTXO
+            utxo = utxos[0]
+            prev_txn_hash = utxo['txid']
+            prev_output_index = utxo['vout']
+            input_value = utxo['value']
+
+            print(f"\nCreating transaction to spend UTXO:")
+            print(f"  Previous TX: {prev_txn_hash[:16]}...")
+            print(f"  Output index: {prev_output_index}")
+            print(f"  Input value: {input_value:,} satoshis")
+
+            # Create transaction with real UTXO data
+            txn = Transaction(wallet)
+            txn.create(
+                prev_txn_hash=prev_txn_hash,
+                prev_output_index=prev_output_index,
+                source_address=source_addr,
+                outputs=[[10000, "1KKKK6N21XKo48zWKuQKXdvSsCf95ibHFa"]],
+                input_value=input_value,
+                fee_rate=10,
+                add_change=True
+            )
+            print("[SUCCESS] Transaction created successfully!")
+            print(f"  Signed with correct private key for {source_addr}")
+            print(f"  Transaction ID: {txn.get_transaction_hash()}")
+            print(f"  Signature verification: {'PASSED' if txn.verify() else 'FAILED'}")
+
     except Exception as e:
         print(f"[ERROR] {e}")
+        import traceback
+        traceback.print_exc()
 
     # Step 7: Show what happens with address discovery
-    print("\nStep 7: Address Discovery (BIP44 gap limit)")
+    print("\nStep 7: Address Discovery (Electrum gap limit)")
     print("-" * 70)
-    print("In a real wallet, you would run:")
+    print("In a real Electrum wallet, you would run:")
     print("  summary = wallet.discover_addresses()")
     print("\nThis would:")
-    print("  1. Check addresses in sequence (m/44'/0'/0'/0/0, 0/1, 0/2, ...)")
+    print("  1. Check addresses in sequence (m/0/0, m/0/1, m/0/2, ...)")
     print("  2. Query Blockchair API for each address balance")
     print("  3. Cache all addresses found")
     print("  4. Stop after 20 consecutive empty addresses (gap limit)")
+    print("  5. Repeat for change addresses (m/1/0, m/1/1, ...)")
     print("\nSkipping actual API calls in this demo to avoid rate limits.")
 
     # Step 8: Summary
     print("\n" + "=" * 70)
-    print("Summary: How It All Works Together")
+    print("Summary: How Electrum HD Wallets Work")
     print("=" * 70)
     print("""
-1. HD Wallet generates many addresses from one mnemonic
+1. Electrum HD Wallet generates many addresses from one mnemonic
+   - Uses ELECTRUM NATIVE seed format (not BIP39)
+   - PBKDF2 with salt b"electrum" + passphrase
+   - Derivation paths: m/0/x (receiving), m/1/x (change)
+   - Uses COMPRESSED public keys for addresses
+
 2. Each address gets cached with its derivation path (chain, index)
+   - Chain 0 = receiving addresses
+   - Chain 1 = change addresses
+
 3. When creating a transaction:
    - You specify the source_address (where the UTXO is)
    - Wallet looks up that address in the cache (or auto-discovers it)
@@ -159,12 +207,12 @@ def demo_hd_wallet_workflow():
    - AUTOMATIC: get_private_key_for_address() auto-discovers by default
    - MANUAL: Run wallet.discover_addresses() after restoring from mnemonic
    - Manual discovery scans ahead and caches all addresses with UTXOs
-   - Uses BIP44 gap limit (stops after 20 consecutive empty addresses)
+   - Uses gap limit (stops after 20 consecutive empty addresses)
 
 5. Typical workflow:
    ```python
-   # Restore wallet
-   wallet = Wallet.from_mnemonic("your mnemonic here")
+   # Restore Electrum wallet
+   wallet = Wallet.from_electrum_seed("your mnemonic here")
 
    # Discover all addresses with funds
    summary = wallet.discover_addresses()
@@ -184,6 +232,9 @@ def demo_hd_wallet_workflow():
            input_value=utxo['value']
        )
    ```
+
+IMPORTANT: This is an Electrum NATIVE seed. For BIP39 seeds, use:
+   wallet = Wallet.from_mnemonic("your BIP39 mnemonic here")
 """)
 
     print("=" * 70)

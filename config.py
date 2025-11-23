@@ -132,20 +132,28 @@ class TestRawTransactions:
 class TestHDWallet:
     """Test mnemonic and HD wallet data."""
 
-    # Test mnemonic (12 words) - DO NOT USE FOR REAL FUNDS
-    # Generated for testing purposes only
-    MNEMONIC_12 = "witch collapse practice feed shame open despair creek road again ice least"
+    # Test mnemonic (12 words) - REAL WALLET FOR TESTING
+    # This wallet has real transaction history - NOT FOR PRODUCTION
+    MNEMONIC_12 = "grit problem ball awesome symbol leopard coral toddler must alien ocean satisfy"
 
     # Test mnemonic (24 words) - DO NOT USE FOR REAL FUNDS
     MNEMONIC_24 = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"
 
-    # Expected addresses for MNEMONIC_12 at various derivation paths
-    # m/44'/0'/0'/0/0 (first receiving address)
-    EXPECTED_ADDR_0_0 = "178cS83u7tTsaaBVH71f2CpeZcmxkcm4dA"
-    # m/44'/0'/0'/0/1 (second receiving address)
-    EXPECTED_ADDR_0_1 = "19gM97KgfVjHzJJ8s26BuccMH2pDmDWAUE"
-    # m/44'/0'/0'/1/0 (first change address)
-    EXPECTED_ADDR_1_0 = "13KoAcTenoXWHkMPsuWMDJcYKPj41rPQxi"
+    # Expected addresses for MNEMONIC_12 (Electrum native wallet)
+    # NOTE: This is an Electrum NATIVE seed (not BIP39)
+    # Uses m/0/x (receiving) and m/1/x (change) derivation
+    # Uses COMPRESSED public keys for address generation
+
+    # m/0/0 (first receiving address) - VERIFIED
+    EXPECTED_ADDR_0_0 = "1DqEczkgKeQNDHCoMFubQebMEoNW3Bx7X5"
+    # m/0/1 (second receiving address)
+    EXPECTED_ADDR_0_1 = "1FsARj423XtyNuiLRUEzYZQDZsrKrqaNoV"
+    # m/1/0 (first change address) - VERIFIED
+    EXPECTED_ADDR_1_0 = "1EGHUD4NTGWR5n1bL9qroHqbTaMoPZE6a7"
+
+    # Known addresses with transaction history
+    KNOWN_ADDR_WITH_TXS = "1DqEczkgKeQNDHCoMFubQebMEoNW3Bx7X5"
+    KNOWN_CHANGE_ADDR = "1EGHUD4NTGWR5n1bL9qroHqbTaMoPZE6a7"
 
     # Default derivation path for Bitcoin (BIP44)
     DEFAULT_PATH = "m/44'/0'/0'/0/0"
@@ -157,3 +165,70 @@ class TestHDWallet:
     # Chain types
     EXTERNAL_CHAIN = 0  # Receiving addresses
     INTERNAL_CHAIN = 1  # Change addresses
+
+    # Electrum master key verification (from Electrum wallet)
+    ELECTRUM_MASTER_XPUB = "xpub661MyMwAqRbcFWMdzBLTpwv2egaPXhWBAmoStC5rUkEFZ8RyajXySawMCrH12h1obtVY8pdKAdS8mperMLe6KUyppduasmNHibUnM37nq9q"
+    ELECTRUM_ROOT_FINGERPRINT = "f5934df8"
+
+
+# ============================================================================
+# ROLLBACK CONFIGURATION
+# ============================================================================
+
+class RollbackConfig:
+    """Configuration for rollback mechanisms and performance tracking."""
+
+    # ========================================================================
+    # Runner Configuration
+    # ========================================================================
+
+    RUNNER_CONFIG = {
+        'verbose': True,              # Print detailed output
+        'log_to_file': True,          # Save results to JSON files
+        'output_dir': 'output',       # Directory for output files
+        'show_timing': True,          # Display execution time
+        'pretty_print': True,         # Format output nicely
+    }
+
+    # ========================================================================
+    # RIPEMD-160 Rollback Configuration
+    # ========================================================================
+
+    RIPEMD160_CONFIG = {
+        'mechanism_type': 'brute',    # Type of mechanism to use
+        'verbose': True,              # Print diagnostic output
+        'max_iterations': None,       # Maximum iterations (None = unlimited)
+    }
+
+    # Test addresses for rollback
+    TEST_ADDRESSES = {
+        'key1': "12vieiAHxBe4qCUrwvfb2kRkDuc8kQ8qSw",  # From TestKeys.KEY1_HEX
+        'key2': "16UwLL9Risc3QfPqBUvKofHmBQ7wMtjvM",  # From TestKeys.KEY2_HEX
+        'key3': "1BTCorgHwCg6u2YSAWKgS17qUad6kHmtQW",  # From TestKeys.KEY3_HEX
+    }
+
+    # ========================================================================
+    # ECDSA Rollback Configuration
+    # ========================================================================
+
+    ECDSA_CONFIG = {
+        'mechanism_type': 'brute',    # Type of mechanism to use
+        'verbose': True,              # Print diagnostic output
+        'max_iterations': None,       # Maximum iterations (None = unlimited)
+    }
+
+    # ========================================================================
+    # Performance Tracking Configuration
+    # ========================================================================
+
+    PERFORMANCE_CONFIG = {
+        'enabled': True,              # Enable performance tracking
+        'track_memory': True,         # Track memory usage
+        'track_cpu': True,            # Track CPU time
+        'save_results': True,         # Save performance results to file
+        'results_dir': 'output/performance',  # Directory for performance results
+        'compare_methods': True,      # Enable method comparison
+        'warmup_runs': 0,            # Number of warmup runs before timing
+        'repeat_runs': 1,            # Number of times to repeat each test
+        'print_summary': True,        # Print summary after each test
+    }

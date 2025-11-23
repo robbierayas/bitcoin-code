@@ -1,0 +1,7 @@
+{
+  "verbose": true,
+  "log_to_file": true,
+  "output_dir": "output",
+  "show_timing": true,
+  "pretty_print": true
+}

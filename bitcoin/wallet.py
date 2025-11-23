@@ -2,16 +2,22 @@
 Wallet class for Bitcoin key and transaction management
 
 Provides a higher-level interface for Bitcoin operations.
+Supports both BIP39 and Electrum native seeds.
 """
 
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+import hashlib
+import hmac
+import unicodedata
+
 from cryptography.keypair import KeyPair
-from cryptography import bip32
+from cryptography import bip32, base58Utils
 from config import TestKeys, TestHDWallet
 from bitcoin import blockchair
+from bitcoin import electrum_utils
 
 
 class Wallet:
@@ -45,6 +51,8 @@ class Wallet:
 
         # HD wallet properties (None for single-key wallets)
         self.is_hd = False
+        self.wallet_type = 'single-key'  # 'single-key', 'bip39', or 'electrum'
+        self.seed_type = None  # For Electrum: 'standard', 'segwit', etc.
         self.master_node = None
         self.account_index = 0
         self.external_index = 0  # Receiving addresses
@@ -61,7 +69,11 @@ class Wallet:
         Returns:
             str: Bitcoin address (Base58Check encoded)
         """
-        return self.keypair.get_address()
+        # For Electrum wallets, use compressed public keys
+        if hasattr(self, 'wallet_type') and self.wallet_type == 'electrum':
+            return electrum_utils.pubkey_to_address_compressed(self.keypair.publickey)
+        else:
+            return self.keypair.get_address()
 
     def get_public_key(self):
         """
@@ -181,6 +193,7 @@ class Wallet:
 
         # Store HD wallet state
         wallet.is_hd = True
+        wallet.wallet_type = 'bip39'
         wallet.master_node = master_node
         wallet.account_index = account
         wallet.external_index = 0
@@ -188,6 +201,67 @@ class Wallet:
 
         # Cache first address (external chain, index 0)
         first_address = first_node.get_address()
+        wallet._address_cache[first_address] = (0, 0)  # (chain, index)
+
+        return wallet
+
+    @classmethod
+    def from_electrum_seed(cls, mnemonic=None, passphrase=""):
+        """
+        Create HD Wallet from Electrum native seed.
+
+        Electrum uses different derivation than BIP39:
+        - PBKDF2 salt: b"electrum" + passphrase (not b"mnemonic")
+        - Paths: m/0/x (receiving), m/1/x (change)
+        - Uses COMPRESSED public keys for addresses
+
+        Args:
+            mnemonic (str, optional): Electrum mnemonic (defaults to test mnemonic)
+            passphrase (str): Optional seed extension
+
+        Returns:
+            Wallet: New Electrum HD Wallet instance
+
+        Example:
+            >>> wallet = Wallet.from_electrum_seed()
+            >>> wallet.is_hd
+            True
+            >>> wallet.wallet_type
+            'electrum'
+        """
+        if mnemonic is None:
+            mnemonic = TestHDWallet.MNEMONIC_12
+
+        # Verify it's an Electrum seed
+        seed_type = electrum_utils.is_electrum_seed(mnemonic)
+        if not seed_type:
+            raise ValueError("Not a valid Electrum seed. Use from_mnemonic() for BIP39 seeds.")
+
+        # Convert mnemonic to seed (Electrum method)
+        seed = electrum_utils.electrum_mnemonic_to_seed(mnemonic, passphrase)
+
+        # Generate master key
+        master_node = bip32.master_key_from_seed(seed)
+
+        # Get first receiving address (m/0/0) with COMPRESSED pubkey
+        first_node = bip32.derive_from_path(master_node, "m/0/0")
+        first_address = electrum_utils.pubkey_to_address_compressed(
+            first_node.get_keypair().publickey
+        )
+
+        # Create wallet with first address private key
+        wallet = cls(first_node.get_private_key_hex())
+
+        # Store HD wallet state
+        wallet.is_hd = True
+        wallet.wallet_type = 'electrum'
+        wallet.seed_type = seed_type
+        wallet.master_node = master_node
+        wallet.account_index = 0
+        wallet.external_index = 0
+        wallet.internal_index = 0
+
+        # Cache first address (external chain, index 0)
         wallet._address_cache[first_address] = (0, 0)  # (chain, index)
 
         return wallet
@@ -210,12 +284,23 @@ class Wallet:
             # Single-key wallet - use same address for change
             return self.get_address()
 
-        # HD wallet - derive change address from internal chain
-        # Path: m/44'/0'/account'/1/internal_index
-        path = f"m/44'/0'/{self.account_index}'/1/{self.internal_index}"
+        # Determine derivation path based on wallet type
+        if self.wallet_type == 'electrum':
+            # Electrum: m/1/x (change path)
+            path = f"m/1/{self.internal_index}"
+        else:
+            # BIP39/BIP44: m/44'/0'/account'/1/internal_index
+            path = f"m/44'/0'/{self.account_index}'/1/{self.internal_index}"
+
         node = bip32.derive_from_path(self.master_node, path)
 
-        change_address = node.get_address()
+        # Get address (compressed for Electrum, uncompressed for BIP39)
+        if self.wallet_type == 'electrum':
+            change_address = electrum_utils.pubkey_to_address_compressed(
+                node.get_keypair().publickey
+            )
+        else:
+            change_address = node.get_address()
 
         # Cache this address (internal chain = 1, current index)
         self._address_cache[change_address] = (1, self.internal_index)
@@ -245,12 +330,23 @@ class Wallet:
             # Single-key wallet - always same address
             return self.get_address()
 
-        # HD wallet - derive new receiving address from external chain
-        # Path: m/44'/0'/account'/0/external_index
-        path = f"m/44'/0'/{self.account_index}'/0/{self.external_index}"
+        # Determine derivation path based on wallet type
+        if self.wallet_type == 'electrum':
+            # Electrum: m/0/x (receiving path)
+            path = f"m/0/{self.external_index}"
+        else:
+            # BIP39/BIP44: m/44'/0'/account'/0/external_index
+            path = f"m/44'/0'/{self.account_index}'/0/{self.external_index}"
+
         node = bip32.derive_from_path(self.master_node, path)
 
-        receiving_address = node.get_address()
+        # Get address (compressed for Electrum, uncompressed for BIP39)
+        if self.wallet_type == 'electrum':
+            receiving_address = electrum_utils.pubkey_to_address_compressed(
+                node.get_keypair().publickey
+            )
+        else:
+            receiving_address = node.get_address()
 
         # Cache this address (external chain = 0, current index)
         self._address_cache[receiving_address] = (0, self.external_index)
@@ -294,7 +390,13 @@ class Wallet:
         # HD wallet - check cache first
         if address in self._address_cache:
             chain, index = self._address_cache[address]
-            path = f"m/44'/0'/{self.account_index}'/{chain}/{index}"
+
+            # Use appropriate derivation path based on wallet type
+            if self.wallet_type == 'electrum':
+                path = f"m/{chain}/{index}"
+            else:
+                path = f"m/44'/0'/{self.account_index}'/{chain}/{index}"
+
             node = bip32.derive_from_path(self.master_node, path)
             return node.get_private_key_hex()
 
@@ -302,9 +404,21 @@ class Wallet:
         if auto_discover:
             # Search external chain (receiving addresses)
             for index in range(search_limit):
-                path = f"m/44'/0'/{self.account_index}'/0/{index}"
+                # Use appropriate derivation path based on wallet type
+                if self.wallet_type == 'electrum':
+                    path = f"m/0/{index}"
+                else:
+                    path = f"m/44'/0'/{self.account_index}'/0/{index}"
+
                 node = bip32.derive_from_path(self.master_node, path)
-                addr = node.get_address()
+
+                # Get address (compressed for Electrum, uncompressed for BIP39)
+                if self.wallet_type == 'electrum':
+                    addr = electrum_utils.pubkey_to_address_compressed(
+                        node.get_keypair().publickey
+                    )
+                else:
+                    addr = node.get_address()
 
                 # Cache this address
                 self._address_cache[addr] = (0, index)
@@ -317,9 +431,21 @@ class Wallet:
 
             # Search internal chain (change addresses)
             for index in range(search_limit):
-                path = f"m/44'/0'/{self.account_index}'/1/{index}"
+                # Use appropriate derivation path based on wallet type
+                if self.wallet_type == 'electrum':
+                    path = f"m/1/{index}"
+                else:
+                    path = f"m/44'/0'/{self.account_index}'/1/{index}"
+
                 node = bip32.derive_from_path(self.master_node, path)
-                addr = node.get_address()
+
+                # Get address (compressed for Electrum, uncompressed for BIP39)
+                if self.wallet_type == 'electrum':
+                    addr = electrum_utils.pubkey_to_address_compressed(
+                        node.get_keypair().publickey
+                    )
+                else:
+                    addr = node.get_address()
 
                 # Cache this address
                 self._address_cache[addr] = (1, index)
@@ -336,7 +462,7 @@ class Wallet:
             f"It may not belong to this wallet, or you can increase search_limit parameter."
         )
 
-    def discover_addresses(self, gap_limit=20):
+    def discover_addresses(self, gap_limit=20, derivation_standard='auto'):
         """
         Discover addresses with UTXOs by scanning ahead (BIP44 gap limit).
 
@@ -345,12 +471,18 @@ class Wallet:
 
         Args:
             gap_limit (int): Number of consecutive empty addresses before stopping (default: 20)
+            derivation_standard (str): Which derivation path to use:
+                - 'auto': Try BIP44, then Electrum if nothing found
+                - 'bip44': BIP44 standard (m/44'/0'/0'/0/x)
+                - 'electrum': Electrum legacy (m/0/x)
+                - 'all': Scan all standards
 
         Returns:
             dict: Summary of discovery {
                 'external': number of external addresses found,
                 'internal': number of internal addresses found,
-                'total_balance': total balance in satoshis
+                'total_balance': total balance in satoshis,
+                'standard_used': which derivation standard found addresses
             }
 
         Example:
@@ -359,91 +491,138 @@ class Wallet:
             >>> print(f"Found {summary['external']} receiving addresses")
         """
         if not self.is_hd:
-            return {'external': 1, 'internal': 0, 'total_balance': 0}
+            return {'external': 1, 'internal': 0, 'total_balance': 0, 'standard_used': 'single-key'}
 
         print("Discovering addresses (this may take a moment)...")
 
-        external_found = 0
-        internal_found = 0
-        total_balance = 0
+        # Define derivation standards
+        standards = []
+        if derivation_standard == 'auto':
+            # Try BIP44 first (most common), then Electrum
+            standards = [
+                ('BIP44', f"m/44'/0'/{self.account_index}'/0/{{}}", f"m/44'/0'/{self.account_index}'/1/{{}}"),
+                ('Electrum', "m/0/{}", "m/1/{}"),
+            ]
+        elif derivation_standard == 'bip44':
+            standards = [('BIP44', f"m/44'/0'/{self.account_index}'/0/{{}}", f"m/44'/0'/{self.account_index}'/1/{{}}")]
+        elif derivation_standard == 'electrum':
+            standards = [('Electrum', "m/0/{}", "m/1/{}")]
+        elif derivation_standard == 'all':
+            standards = [
+                ('BIP44', f"m/44'/0'/{self.account_index}'/0/{{}}", f"m/44'/0'/{self.account_index}'/1/{{}}"),
+                ('Electrum', "m/0/{}", "m/1/{}"),
+                ('BIP49', f"m/49'/0'/{self.account_index}'/0/{{}}", f"m/49'/0'/{self.account_index}'/1/{{}}"),
+                ('BIP84', f"m/84'/0'/{self.account_index}'/0/{{}}", f"m/84'/0'/{self.account_index}'/1/{{}}"),
+            ]
 
-        # Discover external chain (receiving addresses)
-        gap_count = 0
-        index = 0
+        best_result = {'external': 0, 'internal': 0, 'total_balance': 0, 'standard_used': 'none'}
 
-        while gap_count < gap_limit:
-            path = f"m/44'/0'/{self.account_index}'/0/{index}"
-            node = bip32.derive_from_path(self.master_node, path)
-            addr = node.get_address()
+        for standard_name, external_pattern, internal_pattern in standards:
+            print(f"\n=== Scanning {standard_name} ===")
 
-            # Cache this address
-            self._address_cache[addr] = (0, index)
+            external_found = 0
+            internal_found = 0
+            total_balance = 0
 
-            # Check if address has any activity
-            try:
-                balance = blockchair.get_address_balance(addr)
-                if balance['total'] > 0:
-                    external_found += 1
-                    total_balance += balance['total']
-                    gap_count = 0  # Reset gap counter
-                    print(f"  Found address {index}: {addr} ({balance['total']} sats)")
-                else:
+            # Discover external chain (receiving addresses)
+            gap_count = 0
+            index = 0
+
+            while gap_count < gap_limit:
+                path = external_pattern.format(index)
+                node = bip32.derive_from_path(self.master_node, path)
+                addr = node.get_address()
+
+                # Cache this address
+                self._address_cache[addr] = (0, index)
+
+                # Check if address has any activity (BIP44: check transaction history, not balance)
+                try:
+                    balance = blockchair.get_address_balance(addr)
+                    # Address is "used" if it has any transaction history, even if balance is 0
+                    if balance['transaction_count'] > 0:
+                        external_found += 1
+                        total_balance += balance['total']
+                        gap_count = 0  # Reset gap counter
+                        print(f"  Found external {index}: {addr} ({balance['transaction_count']} txs, {balance['total']} sats)")
+                    else:
+                        gap_count += 1
+                except blockchair.BlockchairError:
+                    # API error, assume empty
                     gap_count += 1
-            except blockchair.BlockchairError:
-                # API error, assume empty
-                gap_count += 1
 
-            index += 1
+                index += 1
 
-            # Safety limit
-            if index > 1000:
-                print("  Reached safety limit of 1000 addresses")
-                break
+                # Safety limit
+                if index > 1000:
+                    print("  Reached safety limit of 1000 addresses")
+                    break
 
-        # Update external index to continue from where we left off
-        self.external_index = index
+            # Update external index if this is the active standard
+            if external_found > 0:
+                self.external_index = index
 
-        # Discover internal chain (change addresses)
-        gap_count = 0
-        index = 0
+            # Discover internal chain (change addresses)
+            gap_count = 0
+            index = 0
 
-        while gap_count < gap_limit:
-            path = f"m/44'/0'/{self.account_index}'/1/{index}"
-            node = bip32.derive_from_path(self.master_node, path)
-            addr = node.get_address()
+            while gap_count < gap_limit:
+                path = internal_pattern.format(index)
+                node = bip32.derive_from_path(self.master_node, path)
+                addr = node.get_address()
 
-            # Cache this address
-            self._address_cache[addr] = (1, index)
+                # Cache this address
+                self._address_cache[addr] = (1, index)
 
-            # Check if address has any activity
-            try:
-                balance = blockchair.get_address_balance(addr)
-                if balance['total'] > 0:
-                    internal_found += 1
-                    total_balance += balance['total']
-                    gap_count = 0
-                    print(f"  Found change address {index}: {addr} ({balance['total']} sats)")
-                else:
+                # Check if address has any activity (BIP44: check transaction history, not balance)
+                try:
+                    balance = blockchair.get_address_balance(addr)
+                    # Address is "used" if it has any transaction history, even if balance is 0
+                    if balance['transaction_count'] > 0:
+                        internal_found += 1
+                        total_balance += balance['total']
+                        gap_count = 0
+                        print(f"  Found change {index}: {addr} ({balance['transaction_count']} txs, {balance['total']} sats)")
+                    else:
+                        gap_count += 1
+                except blockchair.BlockchairError:
                     gap_count += 1
-            except blockchair.BlockchairError:
-                gap_count += 1
 
-            index += 1
+                index += 1
 
-            if index > 1000:
-                print("  Reached safety limit of 1000 change addresses")
-                break
+                if index > 1000:
+                    print("  Reached safety limit of 1000 change addresses")
+                    break
 
-        # Update internal index
-        self.internal_index = index
+            # Update internal index if this is the active standard
+            if internal_found > 0:
+                self.internal_index = index
 
-        print(f"Discovery complete: {external_found} receiving, {internal_found} change addresses")
+            # Track best result
+            total_found = external_found + internal_found
+            if total_found > 0:
+                print(f"  {standard_name}: {external_found} external, {internal_found} change addresses")
 
-        return {
-            'external': external_found,
-            'internal': internal_found,
-            'total_balance': total_balance
-        }
+                # Update best result if this standard found more addresses
+                if total_found > (best_result['external'] + best_result['internal']):
+                    best_result = {
+                        'external': external_found,
+                        'internal': internal_found,
+                        'total_balance': total_balance,
+                        'standard_used': standard_name
+                    }
+
+                # For 'auto' mode, stop after finding addresses with first standard
+                if derivation_standard == 'auto':
+                    print(f"\nUsing {standard_name} derivation standard")
+                    break
+
+        if best_result['standard_used'] == 'none':
+            print("\nNo addresses found in any derivation standard")
+        else:
+            print(f"\nDiscovery complete ({best_result['standard_used']}): {best_result['external']} external, {best_result['internal']} change addresses")
+
+        return best_result
 
     def find_utxos(self, min_confirmations=1):
         """

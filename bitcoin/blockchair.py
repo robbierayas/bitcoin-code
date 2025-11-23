@@ -118,7 +118,7 @@ def find_utxos(address, min_confirmations=1):
 
 def get_address_balance(address):
     """
-    Get balance for a Bitcoin address.
+    Get balance and transaction info for a Bitcoin address.
 
     Args:
         address (str): Bitcoin address
@@ -128,10 +128,12 @@ def get_address_balance(address):
             - confirmed (int): Confirmed balance in satoshis
             - unconfirmed (int): Unconfirmed balance in satoshis
             - total (int): Total balance in satoshis
+            - transaction_count (int): Number of transactions (0 = unused address)
 
     Example:
         >>> balance = get_address_balance("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
         >>> print(f"Balance: {balance['total']} satoshis")
+        >>> print(f"Has been used: {balance['transaction_count'] > 0}")
 
     Raises:
         BlockchairError: If API request fails
@@ -156,7 +158,8 @@ def get_address_balance(address):
     return {
         'confirmed': address_info.get('balance', 0),
         'unconfirmed': address_info.get('unconfirmed_balance', 0),
-        'total': address_info.get('balance', 0) + address_info.get('unconfirmed_balance', 0)
+        'total': address_info.get('balance', 0) + address_info.get('unconfirmed_balance', 0),
+        'transaction_count': address_info.get('transaction_count', 0)
     }
 
 

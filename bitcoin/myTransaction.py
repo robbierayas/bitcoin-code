@@ -9,7 +9,7 @@ startTime = datetime.now()
 from bitcoin import myWallet
 from bitcoin.wallet import Wallet
 from cryptography import ripemd160_educational as myCrypto
-from cryptography.rollback import myRollBack
+from rollback.rollbackRipeMD160 import myRollBack
 from cryptography import base58Utils, keyUtils
 from config import TestKeys
 import math

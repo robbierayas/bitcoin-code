@@ -7,7 +7,9 @@
       "Bash(python test_ripemd160.py:*)",
       "Bash(python ripemd160_educational.py:*)",
       "Bash(python:*)",
-      "WebFetch(domain:docs.google.com)"
+      "WebFetch(domain:docs.google.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": [],
     "ask": []

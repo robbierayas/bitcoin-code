@@ -48,34 +48,137 @@ def parseTxn(txn):
 
 # Substitutes the scriptPubKey into the transaction, appends SIGN_ALL to make the version
 # of the transaction that can be signed
-def getSignableTxn(parsed):
+def getSignableTxn(parsed, debug=False):
     first, sig, pub, rest = parsed
-    inputAddr = base58Utils.base58CheckDecode(keyUtils.pubKeyToAddr(pub))
-    return first + "1976a914" + inputAddr.hex() + "88ac" + rest + "01000000"
+
+    # Handle both compressed and uncompressed public keys when deriving address
+    pubkey_bytes = bytes.fromhex(pub)
+
+    if len(pubkey_bytes) == 33 and pubkey_bytes[0] in (0x02, 0x03):
+        # Compressed key - use compressed address derivation
+        import sys, os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+        from bitcoin import electrum_utils
+        # For compressed keys, calculate address using compressed format
+        sha256_hash = hashlib.sha256(pubkey_bytes).digest()
+        ripemd160_hash = hashlib.new('ripemd160', sha256_hash).digest()
+        inputAddr = ripemd160_hash
+
+        if debug:
+            # Calculate the address for debugging
+            addr = base58Utils.base58CheckEncode(0x00, ripemd160_hash)
+            print(f"  Reconstructed address (compressed): {addr}")
+            print(f"  Reconstructed hash160: {ripemd160_hash.hex()}")
+    else:
+        # Uncompressed key - use standard derivation
+        inputAddr = base58Utils.base58CheckDecode(keyUtils.pubKeyToAddr(pub))
+
+        if debug:
+            addr = keyUtils.pubKeyToAddr(pub)
+            print(f"  Reconstructed address (uncompressed): {addr}")
+            print(f"  Reconstructed hash160: {inputAddr.hex()}")
+
+    result = first + "1976a914" + inputAddr.hex() + "88ac" + rest + "01000000"
+
+    if debug:
+        print(f"  Reconstructed scriptPubKey: 76a914{inputAddr.hex()}88ac")
+
+    return result
 
 # Verifies that a transaction is properly signed, assuming the generated scriptPubKey matches
 # the one in the previous transaction's output
-def verifyTxnSignature(txn):
+def verifyTxnSignature(txn, debug=False):
     parsed = parseTxn(txn)
-    signableTxn = getSignableTxn(parsed)
+
+    if debug:
+        print(f"\nDEBUG verifyTxnSignature:")
+        print(f"  Public key: {parsed[2][:40]}... (len={len(parsed[2])})")
+
+    signableTxn = getSignableTxn(parsed, debug=debug)
     hashToSign = hashlib.sha256(hashlib.sha256(bytes.fromhex(signableTxn)).digest()).digest().hex()
     assert(parsed[1][-2:] == '01') # hashtype
     sig = keyUtils.derSigToHexSig(parsed[1][:-2])
     public_key = parsed[2]
-    vk = ecdsa.VerifyingKey.from_string(bytes.fromhex(public_key[2:]), curve=ecdsa.SECP256k1)
+
+    if debug:
+        print(f"  Signable txn: {signableTxn[:80]}...")
+        print(f"  Hash to sign: {hashToSign}")
+        print(f"  Signature: {sig[:40]}...")
+
+    # Handle both compressed and uncompressed public keys
+    pubkey_bytes = bytes.fromhex(public_key)
+
+    if len(pubkey_bytes) == 65 and pubkey_bytes[0] == 0x04:
+        # Uncompressed key: 04 + x + y (65 bytes total)
+        # Strip the 04 prefix for ecdsa library
+        vk = ecdsa.VerifyingKey.from_string(pubkey_bytes[1:], curve=ecdsa.SECP256k1)
+    elif len(pubkey_bytes) == 33 and pubkey_bytes[0] in (0x02, 0x03):
+        # Compressed key: 02/03 + x (33 bytes total)
+        # Use from_string with compressed encoding support
+        vk = ecdsa.VerifyingKey.from_string(
+            pubkey_bytes,
+            curve=ecdsa.SECP256k1,
+            validate_point=True,
+            valid_encodings=("compressed",)
+        )
+    else:
+        raise ValueError(f"Invalid public key format: length={len(pubkey_bytes)}, prefix={pubkey_bytes[0]:02x}")
+
+    if debug:
+        print(f"  Verifying...")
     assert(vk.verify_digest(bytes.fromhex(sig), bytes.fromhex(hashToSign)))
 
-def makeSignedTransaction(privateKey, outputTransactionHash, sourceIndex, scriptPubKey, outputs):
+def makeSignedTransaction(privateKey, outputTransactionHash, sourceIndex, scriptPubKey, outputs, compressed=False, debug=False):
+    """
+    Create and sign a Bitcoin transaction.
+
+    Args:
+        privateKey (str): Private key as hex string
+        outputTransactionHash (str): Hash of previous transaction
+        sourceIndex (int): Output index in previous transaction
+        scriptPubKey (str): Script public key of output being spent
+        outputs (list): List of [satoshis, scriptPubKey] pairs
+        compressed (bool): Use compressed public key format (default: False)
+                          Set to True for Electrum wallets
+        debug (bool): Print debug information
+
+    Returns:
+        str: Hex-encoded signed transaction
+    """
     myTxn_forSig = (makeRawTransaction(outputTransactionHash, sourceIndex, scriptPubKey, outputs)
          + "01000000") # hash code
 
+    if debug:
+        print(f"\nDEBUG makeSignedTransaction:")
+        print(f"  scriptPubKey: {scriptPubKey}")
+        print(f"  Txn for sig: {myTxn_forSig[:80]}...")
+        print(f"  Compressed: {compressed}")
+
     s256 = hashlib.sha256(hashlib.sha256(bytes.fromhex(myTxn_forSig)).digest()).digest()
+
+    if debug:
+        print(f"  Hash to sign: {s256.hex()}")
+
     sk = ecdsa.SigningKey.from_string(bytes.fromhex(privateKey), curve=ecdsa.SECP256k1)
     sig = sk.sign_digest(s256, sigencode=ecdsa.util.sigencode_der) + b'\x01' # 01 is hashtype
+
+    # Get public key (uncompressed by default)
     pubKey = keyUtils.privateKeyToPublicKey(privateKey)
+
+    # Convert to compressed format if needed (for Electrum wallets)
+    if compressed:
+        # Import here to avoid circular dependency
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+        from bitcoin import electrum_utils
+        compressed_key = electrum_utils.get_compressed_pubkey(pubKey)
+        pubKey = compressed_key.hex()
+
+    if debug:
+        print(f"  Public key: {pubKey[:40]}... (len={len(pubKey)})")
+
     scriptSig = msgUtils.varstr(sig).hex() + msgUtils.varstr(bytes.fromhex(pubKey)).hex()
     signed_txn = makeRawTransaction(outputTransactionHash, sourceIndex, scriptSig, outputs)
-    verifyTxnSignature(signed_txn)
+    verifyTxnSignature(signed_txn, debug=debug)
     return signed_txn
     
 class TestTxnUtils(unittest.TestCase):

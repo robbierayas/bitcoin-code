@@ -201,13 +201,18 @@ class Transaction:
                 f"by this wallet, or run wallet.discover_addresses() first."
             )
 
+        # Check if this is an Electrum wallet (uses compressed keys)
+        use_compressed = (hasattr(self.wallet, 'wallet_type') and
+                         self.wallet.wallet_type == 'electrum')
+
         # Create signed transaction
         self.raw_txn = txnUtils.makeSignedTransaction(
             private_key,
             prev_txn_hash,
             prev_output_index,
             source_script_pubkey,
-            formatted_outputs
+            formatted_outputs,
+            compressed=use_compressed
         )
 
         # Calculate actual size and fee rate
