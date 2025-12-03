@@ -1,6 +1,53 @@
 # Python Development Guide for Claude (Converted from Node.js)
 
+> **NEVER DELETE FROM THIS FILE** - Only add or update. This file accumulates project-agnostic learnings for faster future development across all projects.
+
 **Source Reference:** This guide is the Python equivalent of `bitcoin/node.txt` (Node.js guide)
+
+---
+
+## Documentation Hierarchy: CLAUDE.md vs README vs .md
+
+| File Type | Purpose | Content |
+|-----------|---------|---------|
+| **README.md** | Quick start after being away | How to run, basic explanations, links to deeper docs |
+| **CLAUDE.md** | Quick project context for Claude | Folder overview, links to READMEs and .md files, NOT every file (outdates fast) |
+| **.md reference files** | Deep dives | Detailed algorithms, math, implementation notes |
+
+**Guidelines:**
+- **README** = dive back in quickly. Commands to run, what each folder does, link to deeper .md
+- **CLAUDE.md** = quick context. Project structure, which READMEs exist, references to useful .md files. Keep character limit in mind - don't duplicate README content, just point to it
+- **.md files** = reference material. Algorithm details, complexity analysis, design decisions. CLAUDE.md should link to useful ones for quick lookup
+
+**Example flow:**
+1. Claude reads CLAUDE.md -> sees project has `rollback/` folder with README
+2. CLAUDE.md says "for ECDLP attacks see rollback/README.md"
+3. Claude reads rollback/README.md only if needed for current task
+4. README links to reference/classical_ecdlp_algorithms.md for deep algorithm details
+
+---
+
+## Windows Console Compatibility
+
+**IMPORTANT:** Do NOT use special Unicode characters in Python print statements or string literals. Windows console (cp1252 encoding) cannot display many Unicode characters and will crash with `UnicodeEncodeError`.
+
+**Avoid these characters:**
+- Math symbols: `~ <= >= +- x / sqrt() SUM PROD INT INF`
+- Greek letters: `alpha beta gamma delta epsilon psi phi pi`
+- Subscripts/superscripts: `_0 _1 _2 ^3 ^4 ^n`
+- Special symbols: `-> <- <-> XOR + IN NOT_IN`
+- Box drawing: use `-`, `|`, `+` instead
+
+**Use ASCII alternatives:**
+- `~=` instead of approximately equal
+- `sqrt()` instead of square root symbol
+- `SUM` instead of sigma
+- `psi` instead of Greek psi
+- `->` instead of arrow
+- `|x>` instead of ket notation
+- `n^2` instead of superscript 2
+
+---
 
 ## Python Best Practices and Code Quality
 

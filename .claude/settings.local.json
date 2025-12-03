@@ -9,7 +9,8 @@
       "Bash(python:*)",
       "WebFetch(domain:docs.google.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(if not exist \"C:\\Users\\robbi\\PycharmProjects\\bitcoin-code\\reference\" mkdir \"C:\\Users\\robbi\\PycharmProjects\\bitcoin-code\\reference\")"
     ],
     "deny": [],
     "ask": []

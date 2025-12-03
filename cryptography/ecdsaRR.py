@@ -6,7 +6,16 @@ elliptic curve cryptography used in Bitcoin.
 
 WARNING: For educational purposes only. Not security audited.
 Use standard libraries (ecdsa, cryptography) for production.
+
+For bit-level math explanations, see reference/bitUtils.md
 """
+
+import sys
+import os
+
+# Import common math utilities
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from cryptography.bitUtils import mod_inverse as _mod_inverse
 
 
 class Point:
@@ -70,35 +79,24 @@ class Secp256k1:
     @staticmethod
     def mod_inverse(a, m):
         """
-        Calculate modular inverse: a^(-1) mod m
+        Calculate modular inverse: a^(-1) mod m using Extended Euclidean Algorithm.
 
-        Uses Extended Euclidean Algorithm.
-        Returns x where (a * x) ≡ 1 (mod m)
+        Returns x where (a * x) = 1 (mod m)
+
+        See reference/bitUtils.md for detailed explanation of the algorithm
+        and why it destroys bit relationships.
 
         Args:
-            a: Number to invert
+            a: Number to invert (must be coprime to m)
             m: Modulus
 
         Returns:
             Modular inverse of a mod m
+
+        Raises:
+            ValueError: If inverse doesn't exist (gcd(a,m) != 1)
         """
-        if a < 0:
-            a = a % m
-
-        # Extended Euclidean Algorithm
-        old_r, r = a, m
-        old_s, s = 1, 0
-
-        while r != 0:
-            quotient = old_r // r
-            old_r, r = r, old_r - quotient * r
-            old_s, s = s, old_s - quotient * s
-
-        # old_r is gcd(a, m), should be 1 for inverse to exist
-        if old_r != 1:
-            raise ValueError(f"Modular inverse does not exist for {a} mod {m}")
-
-        return old_s % m
+        return _mod_inverse(a, m)
 
     @classmethod
     def point_add(cls, P, Q):
