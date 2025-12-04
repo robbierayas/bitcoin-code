@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from rollback.bruteECDSA4bitMechanism import BruteECDSA4bitMechanism
 from cryptography.ecdsa4bit import (
-    G, N, scalar_multiply, sign, verify, generate_keypair,
+    G, N, point_multiply, sign, verify, generate_keypair,
     to_hex, point_to_hex
 )
 

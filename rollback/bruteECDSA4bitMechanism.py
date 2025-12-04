@@ -23,8 +23,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from rollback.rollbackMechanism import RollbackMechanism
 from cryptography.ecdsa4bit import (
-    P, A, B, G, N, INFINITY,
-    scalar_multiply, point_add, mod_inverse, is_on_curve,
+    p, A, B, G, N, INFINITY,
+    point_multiply, point_add, mod_inverse, is_on_curve,
     generate_all_points, to_hex, point_to_hex
 )
 
@@ -79,7 +79,7 @@ class BruteECDSA4bitMechanism(RollbackMechanism):
         """Build a complete lookup table of k*G for all k in [1, N-1]."""
         table = {}
         for k in range(1, N):
-            kG = scalar_multiply(k, G)
+            kG = point_multiply(k, G)
             if kG is not None:
                 table[kG] = k
         return table
@@ -172,7 +172,7 @@ class BruteECDSA4bitMechanism(RollbackMechanism):
                 print(f"\n*** SUCCESS: Private key recovered = {to_hex(result)} ***")
                 print(f"    Binary: {bin(result)[2:].zfill(4)}")
                 # Verify
-                Q = scalar_multiply(result, G)
+                Q = point_multiply(result, G)
                 if isinstance(self.target, tuple):
                     print(f"    Verification: {to_hex(result)} * G = {point_to_hex(Q)}")
                     print(f"    Target:       {point_to_hex(self.target)}")
@@ -204,7 +204,7 @@ class BruteECDSA4bitMechanism(RollbackMechanism):
             self.stats['point_operations'] += 1
 
             # Compute d * G
-            Q = scalar_multiply(d, G)
+            Q = point_multiply(d, G)
 
             if self.verbose:
                 self.report_progress(f"Testing d={to_hex(d)}: {to_hex(d)}*G = {point_to_hex(Q)}")
@@ -269,8 +269,8 @@ class BruteECDSA4bitMechanism(RollbackMechanism):
         if self.verbose:
             print(f"\n  Giant steps: Computing Q - i*{m}*G for i = 0 to {m-1}")
 
-        mG = scalar_multiply(m, G)  # Precompute m*G
-        neg_mG = (mG[0], (-mG[1]) % P) if mG else None  # -mG for subtraction
+        mG = point_multiply(m, G)  # Precompute m*G
+        neg_mG = (mG[0], (-mG[1]) % p) if mG else None  # -mG for subtraction
         if self.verbose:
             print(f"    {m}*G = {mG}")
             print(f"    -{m}*G = {neg_mG}")
@@ -362,7 +362,7 @@ class BruteECDSA4bitMechanism(RollbackMechanism):
 
         # Initialize: X = a*G + b*Q where a, b are random
         a1, b1 = random.randint(1, N-1), random.randint(1, N-1)
-        X = point_add(scalar_multiply(a1, G), scalar_multiply(b1, target_point))
+        X = point_add(point_multiply(a1, G), point_multiply(b1, target_point))
 
         # Tortoise and hare
         a_tortoise, b_tortoise = a1, b1
@@ -406,7 +406,7 @@ class BruteECDSA4bitMechanism(RollbackMechanism):
                         print("    Delta b = 0, trying again...")
                     # Restart with new random values
                     a1, b1 = random.randint(1, N-1), random.randint(1, N-1)
-                    X = point_add(scalar_multiply(a1, G), scalar_multiply(b1, target_point))
+                    X = point_add(point_multiply(a1, G), point_multiply(b1, target_point))
                     a_tortoise, b_tortoise = a1, b1
                     X_tortoise = X
                     a_hare, b_hare = a1, b1
@@ -419,7 +419,7 @@ class BruteECDSA4bitMechanism(RollbackMechanism):
                         d = N
 
                     # Verify
-                    if scalar_multiply(d, G) == target_point:
+                    if point_multiply(d, G) == target_point:
                         if self.verbose:
                             print(f"    d = ({delta_a}) * ({delta_b})^(-1) mod {N} = {d}")
                         self.stats['found'] = True
@@ -537,7 +537,7 @@ def demo():
 
     # Create a known keypair
     private_key = 0x07
-    public_key = scalar_multiply(private_key, G)
+    public_key = point_multiply(private_key, G)
 
     print(f"\nTest keypair:")
     print(f"  Private key (SECRET): d = {to_hex(private_key)}")

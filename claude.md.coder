@@ -1129,4 +1129,65 @@ def compare_methods(methods: Dict[str, Callable], **tracker_kwargs):
 
 ---
 
+## Console Output Formatting
+
+### Use Tables for Structured Data
+
+**Never** output structured data as inline key=value pairs or raw object repr(). Use ASCII tables for readability.
+
+**Bad:**
+```
+Step 0: old_r=7, r=23, old_s=1, s=0  q=0
+Step 1: old_r=23, r=7, old_s=0, s=1  q=3
+  -1 step: ModInverseState(old_r=2, r=1, old_s=-3, s=10, step=3)  OK
+```
+
+**Good:**
+```
++------+-------+----+-------+-----+---+
+| Step | old_r | r  | old_s | s   | q |
++------+-------+----+-------+-----+---+
+| 0    | 7     | 23 | 1     | 0   | 0 |
+| 1    | 23    | 7  | 0     | 1   | 3 |
++------+-------+----+-------+-----+---+
+```
+
+### Reusable Table Printer
+
+```python
+def print_table(headers: list, rows: list, title: str = None):
+    """Print a formatted ASCII table."""
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(str(cell)))
+
+    row_fmt = "| " + " | ".join(f"{{:<{w}}}" for w in widths) + " |"
+    sep = "+-" + "-+-".join("-" * w for w in widths) + "-+"
+
+    if title:
+        print(f"\n{title}")
+    print(sep)
+    print(row_fmt.format(*headers))
+    print(sep)
+    for row in rows:
+        print(row_fmt.format(*[str(c) for c in row]))
+    print(sep)
+
+# Usage
+headers = ["Step", "Value", "Status"]
+rows = [[0, 123, "OK"], [1, 456, "OK"]]
+print_table(headers, rows, "Results")
+```
+
+### Output Guidelines
+
+1. **Tables** for multi-row structured data (states, results, comparisons)
+2. **Key: Value** for single values or summaries
+3. **Section headers** with `=` or `-` separators for visual breaks
+4. **Avoid** raw `repr()` or `__str__` of dataclasses in output
+5. **Column alignment** - left-align text, right-align numbers when appropriate
+
+---
+
 *This Python development guide is translated from the Node.js guide (`bitcoin/node.txt`) and prioritizes execution speed, token efficiency, and Pythonic code quality.*

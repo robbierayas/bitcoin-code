@@ -107,6 +107,91 @@ def mod_inverse_fermat(a: int, p: int) -> int:
     return pow(a, p - 2, p)
 
 
+# =============================================================================
+# Step-based mod_inverse for rollback support
+# =============================================================================
+
+from dataclasses import dataclass, replace, field
+from typing import Dict
+
+
+@dataclass
+class ModInverseState:
+    """
+    Represents the state at any point during Extended Euclidean Algorithm.
+
+    Attributes:
+        old_r, r: Remainder values (old_r = quotient * r + new_r each step)
+        old_s, s: Coefficient values tracking the inverse
+        step: Current step number (0 = initial)
+        reconstructed_bits: Map of bit_position -> bit_value (0 or 1)
+            Only contains entries for bits that have been determined.
+    """
+    old_r: int
+    r: int
+    old_s: int
+    s: int
+    step: int = 0
+    reconstructed_bits: Dict[int, int] = field(default_factory=dict)
+
+    def copy(self) -> 'ModInverseState':
+        new_state = replace(self)
+        new_state.reconstructed_bits = self.reconstructed_bits.copy()
+        return new_state
+
+    def get_reconstructed_value(self) -> int:
+        """Reconstruct value from known bits (unknown bits = 0)."""
+        value = 0
+        for pos, bit in self.reconstructed_bits.items():
+            if bit:
+                value |= (1 << pos)
+        return value
+
+    def bits_determined(self) -> int:
+        """Return count of determined bits."""
+        return len(self.reconstructed_bits)
+
+
+def mod_inverse_step(state: ModInverseState) -> tuple[ModInverseState, int]:
+    """
+    Perform ONE step of the Extended Euclidean Algorithm.
+
+    This is the atomic operation where bit relationships are destroyed.
+    The integer division quotient = old_r // r mixes ALL bits.
+
+    Args:
+        state: Current EEA state (old_r, r, old_s, s, step)
+
+    Returns:
+        Tuple of (new_state, quotient)
+        - new_state: State after this step
+        - quotient: The computed quotient (needed for rollback)
+
+    Raises:
+        ValueError: If r == 0 (algorithm complete, no more steps)
+    """
+    if state.r == 0:
+        raise ValueError("Cannot step: r=0 means algorithm is complete")
+
+    # THE CRITICAL OPERATION - integer division destroys bit patterns
+    quotient = state.old_r // state.r
+
+    # Compute new values
+    new_r = state.old_r - quotient * state.r
+    new_s = state.old_s - quotient * state.s
+
+    # Create new state (the swap happens here)
+    new_state = ModInverseState(
+        old_r=state.r,
+        r=new_r,
+        old_s=state.s,
+        s=new_s,
+        step=state.step + 1
+    )
+
+    return new_state, quotient
+
+
 def to_hex(val: int, width: int = 2) -> str:
     """
     Convert integer to hex string with 0x prefix.
@@ -212,6 +297,41 @@ def bytes_to_int(b: bytes) -> int:
         Integer value
     """
     return int.from_bytes(b, byteorder='big')
+
+
+def print_table(headers: list, rows: list, title: str = None):
+    """
+    Print a formatted ASCII table.
+
+    Args:
+        headers: List of column header strings
+        rows: List of row data (each row is a list of values)
+        title: Optional title to print above the table
+
+    Example:
+        >>> headers = ["Step", "Value", "Status"]
+        >>> rows = [[0, 123, "OK"], [1, 456, "OK"]]
+        >>> print_table(headers, rows, "Results")
+    """
+    # Calculate column widths
+    widths = [len(str(h)) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(str(cell)))
+
+    # Build format string
+    row_fmt = "| " + " | ".join(f"{{:<{w}}}" for w in widths) + " |"
+    separator = "+-" + "-+-".join("-" * w for w in widths) + "-+"
+
+    # Print table
+    if title:
+        print(f"\n{title}")
+    print(separator)
+    print(row_fmt.format(*[str(h) for h in headers]))
+    print(separator)
+    for row in rows:
+        print(row_fmt.format(*[str(c) for c in row]))
+    print(separator)
 
 
 # =============================================================================

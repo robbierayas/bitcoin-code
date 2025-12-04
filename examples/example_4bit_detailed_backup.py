@@ -16,8 +16,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from cryptography.ecdsa4bit import (
-    P, A, B, G, N, INFINITY,
-    generate_keypair, sign, verify, scalar_multiply,
+    p, A, B, G, N, INFINITY,
+    generate_keypair, sign, verify, point_multiply,
     point_add, generate_all_points, mod_inverse, is_on_curve
 )
 
@@ -30,7 +30,7 @@ def trace_keypair_generation(private_key: int):
     print("\n" + "=" * 70)
     print("KEYPAIR GENERATION TRACE")
     print("=" * 70)
-    print(f"\nCurve: y² = x³ + {A}x + {B} (mod {P})")
+    print(f"\nCurve: y² = x³ + {A}x + {B} (mod {p})")
     print(f"Generator G = {G}")
     print(f"Order N = {N}")
 
@@ -74,7 +74,7 @@ def trace_keypair_generation(private_key: int):
     print(f"\nFinal Public Key Q = {result}")
 
     # Verify
-    direct = scalar_multiply(private_key, G)
+    direct = point_multiply(private_key, G)
     print(f"Verification: {private_key} * G = {direct}")
     assert result == direct
 
@@ -106,7 +106,7 @@ def trace_signature_generation(private_key: int, public_key: tuple, message_hash
 
     # Step 1: Calculate R = k * G
     print(f"\nStep 1: Calculate R = k * G")
-    R = scalar_multiply(nonce, G)
+    R = point_multiply(nonce, G)
     print(f"  R = {nonce} * {G} = {R}")
 
     # Step 2: r = R.x mod N
@@ -183,9 +183,9 @@ def trace_signature_verification(public_key: tuple, message_hash: int, signature
 
     # Step 4: Calculate point R' = u1*G + u2*Q
     print(f"\nStep 4: R' = u1*G + u2*Q")
-    point1 = scalar_multiply(u1, G)
+    point1 = point_multiply(u1, G)
     print(f"  u1 * G = {u1} * {G} = {point1}")
-    point2 = scalar_multiply(u2, public_key)
+    point2 = point_multiply(u2, public_key)
     print(f"  u2 * Q = {u2} * {public_key} = {point2}")
     R_prime = point_add(point1, point2)
     print(f"  R' = {point1} + {point2} = {R_prime}")
@@ -224,7 +224,7 @@ def show_all_points_table():
     print("=" * 70)
 
     points = generate_all_points()
-    print(f"\nAll {len(points)} points on curve y² = x³ + {A}x + {B} (mod {P}):")
+    print(f"\nAll {len(points)} points on curve y² = x³ + {A}x + {B} (mod {p}):")
 
     # Print as table
     print("\n{:>4} | {:>10} | On Curve?".format("Idx", "Point"))
@@ -244,7 +244,7 @@ def show_all_points_table():
     print("\n{:>4} | {:>10} | Binary k".format("k", "k * G"))
     print("-" * 35)
     for k in range(N + 1):
-        kG = scalar_multiply(k, G)
+        kG = point_multiply(k, G)
         if kG is None:
             kG_str = "O (inf)"
         else:

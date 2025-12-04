@@ -40,6 +40,9 @@ The seed in config.py variable MNEMONIC_12 is correct. It has been used to creat
 - 4-bit ECDSA usage? -> `rollback/README.md`
 - Python standards? -> `claude.md.coder`
 
+**Mod Inverse Rollback Note:**
+Do NOT add constraints to the mod_inverse rollback approach. The current finding is that at the final EEA state (old_r=1, r=0), the quotient equals prev_old_r directly, and without upper bounds 0 bits are determinable via brute force. This is an open problem - see `reference/bitUtils.md` Section 6 for details.
+
 ---
 
 ## Project Structure

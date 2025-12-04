@@ -34,8 +34,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from rollback.rollbackMechanism import RollbackMechanism
 from cryptography.ecdsa4bit import (
-    P, A, B, G, N, INFINITY,
-    scalar_multiply, point_add, mod_inverse, is_on_curve,
+    p, A, B, G, N, INFINITY,
+    point_multiply, point_add, mod_inverse, is_on_curve,
     to_hex, point_to_hex
 )
 
@@ -129,7 +129,7 @@ class ShorECDSA4bitMechanism(RollbackMechanism):
             self.print_stats()
             if result is not None:
                 print(f"\nResult: Private key = {to_hex(result)}")
-                Q = scalar_multiply(result, G)
+                Q = point_multiply(result, G)
                 print(f"Verify: {to_hex(result)} * G = {point_to_hex(Q)}")
                 print(f"Match:  {Q == self.target}")
 
@@ -215,7 +215,7 @@ class ShorECDSA4bitMechanism(RollbackMechanism):
         state_table = []
         for d in range(1, N):
             self.stats['classical_operations'] += 1
-            dG = scalar_multiply(d, G)
+            dG = point_multiply(d, G)
             state_table.append((d, dG))
 
             if self.show_quantum_state and self.verbose:
@@ -253,7 +253,7 @@ class ShorECDSA4bitMechanism(RollbackMechanism):
         solution_d = None
         for d in range(1, N):
             self.stats['classical_operations'] += 1
-            if scalar_multiply(d, G) == target_point:
+            if point_multiply(d, G) == target_point:
                 solution_d = d
                 break
 
@@ -364,12 +364,12 @@ class ShorECDSA4bitMechanism(RollbackMechanism):
         for d in range(1, N):
             self.stats['classical_operations'] += 1
             self.stats['total_iterations'] += 1
-            if scalar_multiply(d, G) == target_point:
+            if point_multiply(d, G) == target_point:
                 self.stats['found'] = True
                 if self.verbose:
                     print()
                     print(f"  Found: d = {to_hex(d)}")
-                    print(f"  Verification: {to_hex(d)} * G = {point_to_hex(scalar_multiply(d, G))}")
+                    print(f"  Verification: {to_hex(d)} * G = {point_to_hex(point_multiply(d, G))}")
                 return d
 
         return None
@@ -466,7 +466,7 @@ def demo():
 
     # Create a keypair
     private_key = 0x0B  # Binary: 1011
-    public_key = scalar_multiply(private_key, G)
+    public_key = point_multiply(private_key, G)
 
     print(f"Test keypair:")
     print(f"  Private key (SECRET): d = {to_hex(private_key)} (binary: {bin(private_key)[2:].zfill(4)})")

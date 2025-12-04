@@ -41,8 +41,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from rollback.rollbackMechanism import RollbackMechanism
 from cryptography.ecdsa4bit import (
-    P, A, B, G, N, INFINITY,
-    scalar_multiply, point_add, mod_inverse, is_on_curve,
+    p, A, B, G, N, INFINITY,
+    point_multiply, point_add, mod_inverse, is_on_curve,
     to_hex, point_to_hex
 )
 
@@ -121,7 +121,7 @@ class KangarooECDSA4bitMechanism(RollbackMechanism):
             if s_i > self.range_width:
                 break
             self.jump_distances.append(s_i)
-            self.jump_points.append(scalar_multiply(s_i, G))
+            self.jump_points.append(point_multiply(s_i, G))
 
         self.num_jumps = len(self.jump_distances)
         self.mean_jump = sum(self.jump_distances) / self.num_jumps
@@ -208,7 +208,7 @@ class KangarooECDSA4bitMechanism(RollbackMechanism):
             self.print_stats()
             if result is not None:
                 print(f"\nResult: Private key = {to_hex(result)}")
-                Q = scalar_multiply(result, G)
+                Q = point_multiply(result, G)
                 print(f"Verify: {to_hex(result)} * G = {point_to_hex(Q)}")
                 print(f"Match:  {Q == self.target}")
 
@@ -259,7 +259,7 @@ class KangarooECDSA4bitMechanism(RollbackMechanism):
             print(f'\n[TAME KANGAROO]')
             print(f'  Starting at {to_hex(self.range_end)} * G')
 
-        tame_point = scalar_multiply(self.range_end, G)
+        tame_point = point_multiply(self.range_end, G)
         tame_distance = 0  # Distance traveled from starting point
 
         # Store tame kangaroo's path for collision detection
@@ -327,7 +327,7 @@ class KangarooECDSA4bitMechanism(RollbackMechanism):
                     print(f'    d = {d}')
 
                 # Verify
-                if scalar_multiply(d, G) == target_point:
+                if point_multiply(d, G) == target_point:
                     self.stats['found'] = True
                     return d
                 else:
@@ -363,7 +363,7 @@ def demo():
 
     # Create a keypair where we "know" the key is in a range
     private_key = 0x0B  # 11 in decimal, binary: 1011
-    public_key = scalar_multiply(private_key, G)
+    public_key = point_multiply(private_key, G)
 
     print(f"\nSecret private key: d = {to_hex(private_key)} ({private_key} decimal)")
     print(f"Public key:         Q = {point_to_hex(public_key)}")

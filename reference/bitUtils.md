@@ -251,6 +251,52 @@ through the combination of many operations.
 
 ---
 
+## 6. Single-Step Rollback Analysis
+
+### The Final State Problem
+
+At the end of EEA, the final state is always:
+```
+old_r = 1  (the GCD)
+r = 0      (algorithm termination condition)
+```
+
+Reversing one step from this state:
+```
+prev_old_r = r + q * old_r = 0 + q * 1 = q
+prev_r = old_r = 1
+```
+
+**Key insight:** The quotient q equals prev_old_r directly!
+
+### Constraints and Bit Determination
+
+The only constraint at the final step is that prev_old_r > prev_r (i.e., q > 1) since EEA remainders decrease.
+
+Without knowing an upper bound:
+- Candidates: q = 2, 3, 4, 5, ... (unbounded)
+- Bits determined: 0
+
+Even bit position 0 varies (2=10, 3=11, 4=100, 5=101...).
+
+### Why Constraints Are Not Added
+
+Adding constraints (like "prev_old_r must be < p") would allow determining some bits. However:
+
+1. The constraint itself requires knowing p
+2. At intermediate steps, the relationship between quotients and the original input a is complex
+3. This remains an open research problem
+
+The quotient sequence is the continued fraction representation of a/p. Recovering a from partial quotient information is equivalent to solving a Diophantine equation with insufficient constraints.
+
+### Implementation
+
+See `rollback/rollbackModInverseMechanism.py`:
+- `brute_force_single_step()` - demonstrates single step reversal
+- `demo_single_step_brute_force()` - shows 0 bits determined without bounds
+
+---
+
 ## References
 
 - Menezes, van Oorschot, Vanstone. "Handbook of Applied Cryptography" Ch. 14

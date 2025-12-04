@@ -41,7 +41,7 @@ import os
 
 # Import common math utilities
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from cryptography.bitUtils import mod_inverse, to_hex as _to_hex, to_bin
+from cryptography.bitUtils import mod_inverse, to_hex, to_bin
 
 
 # =============================================================================
@@ -50,7 +50,7 @@ from cryptography.bitUtils import mod_inverse, to_hex as _to_hex, to_bin
 
 # Prime field size: p = 17 = 0x11
 # Arithmetic is done modulo this prime
-P = 0x11
+p = 0x11
 
 # Curve coefficients for y² = x³ + ax + b (mod p)
 A = 0x02  # a = 2
@@ -76,10 +76,6 @@ MAX_4BIT = 0x0F  # 15
 # HELPER FUNCTIONS
 # =============================================================================
 
-def to_hex(val: int, width: int = 2) -> str:
-    """Convert integer to hex string with 0x prefix (wrapper for bitUtils)."""
-    return _to_hex(val, width)
-
 
 def point_to_hex(point: Optional[Tuple[int, int]]) -> str:
     """Convert point to hex string representation."""
@@ -102,8 +98,8 @@ def is_on_curve(point: Optional[Tuple[int, int]]) -> bool:
         return True  # Point at infinity is on the curve
 
     x, y = point
-    left = (y * y) % P
-    right = (x * x * x + A * x + B) % P
+    left = (y * y) % p
+    right = (x * x * x + A * x + B) % p
     return left == right
 
 
@@ -122,7 +118,7 @@ def point_add(p1: Optional[Tuple[int, int]],
     x2, y2 = p2
 
     # Points are inverses -> result is infinity
-    if x1 == x2 and (y1 + y2) % P == 0:
+    if x1 == x2 and (y1 + y2) % p == 0:
         return INFINITY
 
     # Calculate slope (lambda)
@@ -130,36 +126,47 @@ def point_add(p1: Optional[Tuple[int, int]],
         # Point doubling: lambda = (3x² + a) / (2y)
         if y1 == 0:
             return INFINITY
-        numerator = (3 * x1 * x1 + A) % P
-        denominator = (2 * y1) % P
+        numerator = (3 * x1 * x1 + A) % p
+        denominator = (2 * y1) % p
     else:
         # Point addition: lambda = (y2 - y1) / (x2 - x1)
-        numerator = (y2 - y1) % P
-        denominator = (x2 - x1) % P
+        numerator = (y2 - y1) % p
+        denominator = (x2 - x1) % p
 
-    slope = (numerator * mod_inverse(denominator, P)) % P
+    slope = (numerator * mod_inverse(denominator, p)) % p
 
     # New point coordinates
-    x3 = (slope * slope - x1 - x2) % P
-    y3 = (slope * (x1 - x3) - y1) % P
+    x3 = (slope * slope - x1 - x2) % p
+    y3 = (slope * (x1 - x3) - y1) % p
 
     return (x3, y3)
 
 
-def scalar_multiply(k: int, point: Optional[Tuple[int, int]]) -> Optional[Tuple[int, int]]:
+def point_multiply(k: int, P: Optional[Tuple[int, int]] = None) -> Optional[Tuple[int, int]]:
     """
-    Multiply a point by a scalar using double-and-add algorithm.
-    Returns k * point (point added to itself k times)
+    Multiply point by scalar: R = k * P
+
+    Uses double-and-add algorithm for efficiency.
+
+    Args:
+        k: Scalar multiplier
+        P: Point to multiply (defaults to generator G)
+
+    Returns:
+        Point representing k * P
     """
-    if k == 0 or point is None:
+    if P is None:
+        P = G
+
+    if k == 0 or P == INFINITY:
         return INFINITY
 
     if k < 0:
         k = -k
-        point = (point[0], (-point[1]) % P)
+        P = (P[0], (-P[1]) % p)
 
     result = INFINITY
-    addend = point
+    addend = P
 
     while k:
         if k & 1:
@@ -174,10 +181,10 @@ def generate_all_points() -> List[Optional[Tuple[int, int]]]:
     """Generate all points on the curve by enumeration."""
     points = [INFINITY]
 
-    for x in range(P):
-        y_squared = (x * x * x + A * x + B) % P
-        for y in range(P):
-            if (y * y) % P == y_squared:
+    for x in range(p):
+        y_squared = (x * x * x + A * x + B) % p
+        for y in range(p):
+            if (y * y) % p == y_squared:
                 points.append((x, y))
 
     return points
@@ -203,7 +210,7 @@ def generate_keypair(private_key: Optional[int] = None) -> Tuple[int, Tuple[int,
     if not (0x01 <= private_key < N):
         raise ValueError(f"Private key must be in range [0x01, {to_hex(N-1)}]")
 
-    public_key = scalar_multiply(private_key, G)
+    public_key = point_multiply(private_key, G)
     return (private_key, public_key)
 
 
@@ -225,7 +232,7 @@ def sign(private_key: int, message_hash: int, k: Optional[int] = None) -> Tuple[
         k_val = k if k is not None else random.randint(0x01, N - 1)
 
         # R = k * G
-        R = scalar_multiply(k_val, G)
+        R = point_multiply(k_val, G)
         if R is None:
             if k is not None:
                 raise ValueError("Invalid k")
@@ -279,7 +286,7 @@ def verify(public_key: Tuple[int, int], message_hash: int, signature: Tuple[int,
     u2 = (r * w) % N
 
     # R' = u1 * G + u2 * Q
-    R_prime = point_add(scalar_multiply(u1, G), scalar_multiply(u2, public_key))
+    R_prime = point_add(point_multiply(u1, G), point_multiply(u2, public_key))
 
     if R_prime is None:
         return False
@@ -314,7 +321,7 @@ def print_curve_info():
     print("  k      | k * G")
     print("  " + "-" * 30)
     for k in range(0x01, N + 1):
-        kG = scalar_multiply(k, G)
+        kG = point_multiply(k, G)
         print(f"  {to_hex(k, 2)}     | {point_to_hex(kG)}")
 
     print("=" * 70)
@@ -351,7 +358,7 @@ def demo():
 
     # Show math
     print("\n--- Signature Math (hex) ---")
-    R = scalar_multiply(k, G)
+    R = point_multiply(k, G)
     print(f"R = k * G = {to_hex(k)} * G = {point_to_hex(R)}")
     print(f"r = R.x mod N = {to_hex(R[0])} mod {to_hex(N)} = {to_hex(r)}")
 
@@ -370,8 +377,8 @@ def demo():
     print(f"u1 = z * w mod N  = {to_hex(u1)}")
     print(f"u2 = r * w mod N  = {to_hex(u2)}")
 
-    R1 = scalar_multiply(u1, G)
-    R2 = scalar_multiply(u2, Q)
+    R1 = point_multiply(u1, G)
+    R2 = point_multiply(u2, Q)
     R_prime = point_add(R1, R2)
     print(f"u1 * G = {point_to_hex(R1)}")
     print(f"u2 * Q = {point_to_hex(R2)}")

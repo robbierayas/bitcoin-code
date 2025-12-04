@@ -40,8 +40,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from rollback.rollbackMechanism import RollbackMechanism
 from cryptography.ecdsa4bit import (
-    P, A, B, G, N, INFINITY,
-    scalar_multiply, point_add, mod_inverse, is_on_curve,
+    p, A, B, G, N, INFINITY,
+    point_multiply, point_add, mod_inverse, is_on_curve,
     to_hex, point_to_hex
 )
 
@@ -195,7 +195,7 @@ class PohligHellmanECDSA4bitMechanism(RollbackMechanism):
             self.print_stats()
             if result is not None:
                 print(f"\nResult: Private key = {to_hex(result)}")
-                Q = scalar_multiply(result, self.generator)
+                Q = point_multiply(result, self.generator)
                 print(f"Verify: {to_hex(result)} * G = {point_to_hex(Q)}")
                 print(f"Match:  {Q == self.target}")
 
@@ -280,7 +280,7 @@ class PohligHellmanECDSA4bitMechanism(RollbackMechanism):
             d = self.group_order
 
         # Verify
-        if scalar_multiply(d, self.generator) == target_point:
+        if point_multiply(d, self.generator) == target_point:
             self.stats['found'] = True
             return d
 
@@ -301,9 +301,9 @@ class PohligHellmanECDSA4bitMechanism(RollbackMechanism):
 
         # Compute generator and target in subgroup of order p^e
         # h = G^(N/p^e) has order p^e
-        h = scalar_multiply(n_div_pe, self.generator)
+        h = point_multiply(n_div_pe, self.generator)
         # Q' = Q^(N/p^e)
-        Q_prime = scalar_multiply(n_div_pe, Q)
+        Q_prime = point_multiply(n_div_pe, Q)
 
         if self.verbose:
             print(f'\n  Subgroup generator h = {n_div_pe}*G = {point_to_hex(h)}')
@@ -329,7 +329,7 @@ class PohligHellmanECDSA4bitMechanism(RollbackMechanism):
             print(f'\n  Using Pohlig lifting for p^e = {p}^{e}')
 
         # gamma = h^(p^(e-1)) has order p
-        gamma = scalar_multiply(p ** (e - 1), h)
+        gamma = point_multiply(p ** (e - 1), h)
 
         if self.verbose:
             print(f'  gamma = h^{p**(e-1)} = {point_to_hex(gamma)} (order {p})')
@@ -343,7 +343,7 @@ class PohligHellmanECDSA4bitMechanism(RollbackMechanism):
 
             # Compute (Q * h^(-d))^(p^(e-1-k))
             exp = p ** (e - 1 - k)
-            point_k = scalar_multiply(exp, h_neg_d)
+            point_k = point_multiply(exp, h_neg_d)
 
             if self.verbose:
                 print(f'  point_k = (Q * h^(-{d}))^{exp} = {point_to_hex(point_k)}')
@@ -361,7 +361,7 @@ class PohligHellmanECDSA4bitMechanism(RollbackMechanism):
             d += d_k * (p ** k)
 
             # Update h_neg_d = Q * h^(-d)
-            h_neg_d = point_add(Q, point_negate(scalar_multiply(d, h)))
+            h_neg_d = point_add(Q, point_negate(point_multiply(d, h)))
 
             if self.verbose:
                 print(f'  d so far: {d}')
@@ -401,7 +401,7 @@ class PohligHellmanECDSA4bitMechanism(RollbackMechanism):
             point = point_add(point, h)
 
         # Giant steps: compute Q - i*m*h
-        mh = scalar_multiply(m, h)
+        mh = point_multiply(m, h)
         neg_mh = point_negate(mh) if mh else None
 
         gamma = Q
@@ -499,7 +499,7 @@ def demo():
 
     # Create a keypair
     private_key = 0x0B  # 11 decimal
-    public_key = scalar_multiply(private_key, G)
+    public_key = point_multiply(private_key, G)
 
     print(f"\nTest keypair:")
     print(f"  Private key (SECRET): d = {to_hex(private_key)} ({private_key} decimal)")

@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from rollback.rollbackECDSA4bit import RollbackECDSA4bit
 from rollback.shorECDSA4bitMechanism import ShorECDSA4bitMechanism
 from cryptography.ecdsa4bit import (
-    generate_keypair, sign, to_hex, point_to_hex, scalar_multiply, G
+    generate_keypair, sign, to_hex, point_to_hex, point_multiply, G
 )
 
 
@@ -138,7 +138,7 @@ def example_shor_algorithm():
 
     # Create a keypair
     d = 0x0B  # Private key: 1011 in binary
-    Q = scalar_multiply(d, G)
+    Q = point_multiply(d, G)
 
     print(f"\n[Setup] Created keypair:")
     print(f"  Private key d = {to_hex(d)} (this is SECRET)")
