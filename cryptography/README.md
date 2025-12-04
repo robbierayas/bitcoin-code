@@ -12,7 +12,50 @@ This module implements the cryptographic primitives used in Bitcoin:
 
 **WARNING:** Educational only. Not security audited. Use standard libraries for production.
 
-## Files
+## Main Runnable Files
+
+These are the primary files meant to be executed directly:
+
+### ecdsa4bit.py ✓ (RUN THIS)
+**4-bit ECDSA implementation for educational purposes**
+
+A tiny ECDSA implementation where private keys are only 4 bits (1-15). Perfect for learning ECDSA math and testing rollback attacks.
+
+```bash
+python cryptography/ecdsa4bit.py
+```
+
+**Curve parameters:**
+- p = 17 (field prime)
+- Curve: y² = x³ + 2x + 2 (mod 17)
+- G = (5, 1) - Generator point
+- N = 19 - Order (prime, resistant to Pohlig-Hellman)
+
+**Features:**
+- Complete ECDSA: keypair generation, signing, verification
+- All curve operations: point add, double, scalar multiply
+- Educational output showing all intermediate values
+
+### ecdsaRR.py ✓ (RUN THIS)
+**Full secp256k1 ECDSA implementation (256-bit)**
+
+Educational implementation of the real Bitcoin curve. Shows the mathematical operations behind elliptic curve cryptography.
+
+```bash
+python cryptography/ecdsaRR.py
+```
+
+**Features:**
+- Point class with proper infinity handling
+- secp256k1 curve parameters
+- Scalar multiplication (double-and-add)
+- Verification tests
+
+---
+
+## Library Files (Not Standalone)
+
+These files provide functionality used by other modules. They are not meant to be run directly.
 
 ### base58Utils.py ✓
 **Base58 and Base256 encoding utilities**
@@ -145,35 +188,17 @@ hash = RIPEMD160('616263')  # Hash of 'abc' in hex
 
 **Status:** ✓ Verified working - use for production
 
-### ripemd160_educational.py
-**Verbose RIPEMD-160 with extensive debugging output**
+### bitUtils.py ✓
+**Common mathematical utilities**
 
-- Educational version with lots of print statements
-- Shows step-by-step execution
-- Good for learning how RIPEMD-160 works internally
-- Takes SHA-256 hash first, then applies RIPEMD-160
-- May have compatibility issues
+Shared math functions used by ecdsa4bit and ecdsaRR:
+- `mod_inverse(a, p)` - Modular inverse via Extended Euclidean Algorithm
+- `to_hex(n)` - Format number as hex string
+- `to_bin(n)` - Format number as binary string
 
-**Status:** Educational/reference - not recommended for use
+**Used by:** ecdsa4bit.py, ecdsaRR.py
 
-### ripemd160_backup.py
-**Backup copy of educational version**
-
-- Preserved as historical reference
-- Similar to ripemd160_educational.py
-- Kept for comparison purposes
-
-**Status:** Archive only - do not use
-
-### rollback.py
-**Experimental RIPEMD-160 reverse engineering**
-
-- Attempts to reverse Bitcoin addresses
-- Brute force approach to find intermediate hash values
-- Cryptographic research project
-- **No tests yet** - highly experimental
-
-**Status:** Research only - experimental
+**Note:** This file has a `__main__` block for testing but is primarily a library.
 
 ## Testing
 
@@ -243,23 +268,30 @@ ripemd_hash = RIPEMD160(sha256_hash)
 print("Hash160:", ripemd_hash)
 ```
 
-### Educational/Learning
-```python
-# Use ripemd160_educational.py to see step-by-step output
-# (not recommended for actual use)
+### Educational ECDSA
+```bash
+# Run 4-bit ECDSA demo to understand the math
+python cryptography/ecdsa4bit.py
+
+# Run full secp256k1 implementation test
+python cryptography/ecdsaRR.py
 ```
 
 ## File Comparison
 
-| File | Lines | Status | Tests | Use Case |
-|------|-------|--------|-------|----------|
-| base58Utils.py | ~100 | ✓ Working | 11/11 | **Production** |
-| keypair.py | ~200 | ✓ Working | 24/24 | **Production (OOP)** |
-| keyUtils.py | ~120 | ✓ Working | 9/9 | **Production (Legacy)** |
-| ripemd160.py | ~280 | ✓ Working | 15/15 | **Production** |
-| ripemd160_educational.py | ~301 | Educational | N/A | Learning |
-| ripemd160_backup.py | ~301 | Archive | N/A | Reference |
-| rollback.py | ~451 | Experimental | 0 | Research |
+| File | Status | Tests | Use Case |
+|------|--------|-------|----------|
+| **ecdsa4bit.py** | ✓ Working | - | **Run directly** - 4-bit ECDSA demo |
+| **ecdsaRR.py** | ✓ Working | - | **Run directly** - 256-bit ECDSA demo |
+| base58Utils.py | ✓ Working | 11/11 | Library - Base58 encoding |
+| keypair.py | ✓ Working | 24/24 | Library - OOP key management |
+| keyUtils.py | ✓ Working | 9/9 | Library - Legacy key functions |
+| ripemd160.py | ✓ Working | 15/15 | Library - RIPEMD-160 hash |
+| bitUtils.py | ✓ Working | - | Library - Math utilities |
+| bip32.py | ✓ Working | - | Library - HD key derivation |
+| bip39.py | ✓ Working | - | Library - Mnemonic seeds |
+
+**Note:** Files in `old/` folder are deprecated and not included in this table.
 
 ## RIPEMD-160 Algorithm
 

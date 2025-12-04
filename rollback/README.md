@@ -62,10 +62,12 @@ Educational tools for reversing cryptographic operations, focusing on ECDSA disc
 
 | Method | Operations | Time @ 10^12 ops/sec |
 |--------|-----------|---------------------|
-| Forward | ~65,000 | microseconds |
+| Forward | ~65,000 (N^2 = 256^2) | microseconds |
 | Brute reverse | 2^256 * 65k | 10^65 years |
 | Pollard rho | 2^128 * 65k | 10^26 years |
 | Shor (quantum) | poly(N^3) | minutes (with ~4000 qubits) |
+
+**Why forward is ~65,000 ops:** Each of the ~256 point operations (doubles + adds) requires one mod_inverse costing O(N) = O(256) field operations. Total: 256 * 256 = 65,536 operations. At 10^12 ops/sec, that's ~65 nanoseconds (microseconds with overhead).
 
 **Key insight:** The mod_inverse inside each point_add is O(N) and mathematically reversible. The bottleneck is **not knowing which of the 2^N bit patterns to reverse**.
 
@@ -176,8 +178,18 @@ python rollback/run.py --compare
 # Limit iterations
 python rollback/run.py key3 --max-iterations 5000
 
+# Quiet mode
+python rollback/run.py key1 --quiet
+
+# List test addresses
+python rollback/run.py --list-tests
+
 # Ctrl+C anytime to stop gracefully and print stats
 ```
+
+**Troubleshooting:**
+- Run from project root: `cd C:\Users\robbi\PycharmProjects\bitcoin-code`
+- Install deps: `pip install ecdsa pycryptodome`
 
 ## RIPEMD-160 Rollback
 

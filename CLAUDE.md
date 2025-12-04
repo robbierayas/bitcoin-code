@@ -29,7 +29,7 @@ The seed in config.py variable MNEMONIC_12 is correct. It has been used to creat
 | `reference/classical_ecdlp_algorithms.md` | Detailed ECDLP algorithms (Brute, BSGS, Pollard Rho/Kangaroo, Pohlig-Hellman), Bitcoin security analysis |
 | `reference/shor_algorithm.md` | Quantum Fourier Transform, Shor's algorithm math, quantum vs classical comparison, post-quantum crypto |
 | `reference/bitUtils.md` | **Bit-level math**: mod_inverse algorithm, why division destroys bit patterns, mathematical vs bit-level reversibility, slope calculation chain |
-| `cryptography/README.md` | Which RIPEMD-160 implementation to use, crypto module overview |
+| `cryptography/README.md` | Main runnable files (ecdsa4bit, ecdsaRR), crypto module overview |
 | `cryptography/bitUtils.py` | Common math utilities (mod_inverse, hex/bin formatting) shared by ecdsa4bit and ecdsaRR |
 
 **Quick reference for common questions:**
@@ -49,6 +49,7 @@ bitcoin-code/
 ├── bitcoin/              # Bitcoin protocol - see bitcoin/README.md
 ├── cryptography/         # Crypto primitives - see cryptography/README.md
 ├── rollback/             # ECDLP attacks - see rollback/README.md
+├── examples/             # Example scripts - see examples/README.md
 ├── reference/            # Algorithm deep-dives (.md files)
 └── config.py             # Test keys and configuration
 ```
@@ -61,7 +62,7 @@ Detailed docs in each folder's README:
 
 | Module | README | Key Files |
 |--------|--------|-----------|
-| **cryptography/** | [cryptography/README.md](cryptography/README.md) | ripemd160.py, keyUtils.py, base58Utils.py |
+| **cryptography/** | [cryptography/README.md](cryptography/README.md) | ecdsa4bit.py, ecdsaRR.py, keyUtils.py |
 | **bitcoin/** | [bitcoin/README.md](bitcoin/README.md) | txnUtils.py, msgUtils.py, wallet.py |
 | **rollback/** | [rollback/README.md](rollback/README.md) | 4-bit ECDSA attacks, complexity tables |
 
