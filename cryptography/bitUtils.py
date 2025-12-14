@@ -124,6 +124,7 @@ class ModInverseState:
         old_r, r: Remainder values (old_r = quotient * r + new_r each step)
         old_s, s: Coefficient values tracking the inverse
         step: Current step number (0 = initial)
+        quotients: List of quotients from each step (for rollback)
         reconstructed_bits: Map of bit_position -> bit_value (0 or 1)
             Only contains entries for bits that have been determined.
     """
@@ -132,10 +133,12 @@ class ModInverseState:
     old_s: int
     s: int
     step: int = 0
+    quotients: list = field(default_factory=list)
     reconstructed_bits: Dict[int, int] = field(default_factory=dict)
 
     def copy(self) -> 'ModInverseState':
         new_state = replace(self)
+        new_state.quotients = self.quotients.copy()
         new_state.reconstructed_bits = self.reconstructed_bits.copy()
         return new_state
 
@@ -150,6 +153,39 @@ class ModInverseState:
     def bits_determined(self) -> int:
         """Return count of determined bits."""
         return len(self.reconstructed_bits)
+
+
+def mod_inverse_full(a: int, p: int) -> ModInverseState:
+    """
+    Run complete mod_inverse and return final state with all quotients recorded.
+
+    This populates a ModInverseState with the full execution history,
+    making it suitable for rollback operations.
+
+    Args:
+        a: Number to compute inverse of
+        p: Modulus (typically prime)
+
+    Returns:
+        Final ModInverseState with:
+            - old_r = 1 (gcd), r = 0
+            - old_s = inverse (mod p)
+            - quotients = list of all quotients used
+            - step = number of steps taken
+
+    Raises:
+        ValueError: If no inverse exists (gcd != 1)
+    """
+    state = ModInverseState(old_r=a % p, r=p, old_s=1, s=0, step=0)
+
+    while state.r != 0:
+        state, quotient = mod_inverse_step(state)
+        state.quotients.append(quotient)
+
+    if state.old_r != 1:
+        raise ValueError(f"No inverse: gcd({a}, {p}) = {state.old_r}")
+
+    return state
 
 
 def mod_inverse_step(state: ModInverseState) -> tuple[ModInverseState, int]:
@@ -181,12 +217,14 @@ def mod_inverse_step(state: ModInverseState) -> tuple[ModInverseState, int]:
     new_s = state.old_s - quotient * state.s
 
     # Create new state (the swap happens here)
+    # Note: quotients list is copied but not appended - caller decides whether to record
     new_state = ModInverseState(
         old_r=state.r,
         r=new_r,
         old_s=state.s,
         s=new_s,
-        step=state.step + 1
+        step=state.step + 1,
+        quotients=state.quotients.copy()
     )
 
     return new_state, quotient
