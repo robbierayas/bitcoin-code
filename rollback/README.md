@@ -111,6 +111,39 @@ Given only Q and G, you cannot determine:
 
 4. **Bitcoin's Security** - secp256k1 group order is a 256-bit prime. Pohlig-Hellman useless. Only sqrt(n) attacks apply, requiring 2^128 operations (infeasible).
 
+### Addend Constraint (Point Multiply Rollback)
+
+In double-and-add scalar multiplication, when computing `Q = d * G`:
+
+```python
+result = INFINITY
+addend = G                          # addend = 2^0 * G
+while k:
+    if k & 1:
+        result = point_add(result, addend)  # One operand is always addend!
+    addend = point_add(addend, addend)      # addend = 2^i * G
+    k >>= 1
+```
+
+**Key observation:** In every `point_add(result, addend)`, the second operand is always `2^i * G` for some i.
+
+**Precomputed addends (4-bit curve):**
+```python
+ADDENDS = [
+    (0x05, 0x01),  # 2^0  * G = G
+    (0x06, 0x03),  # 2^1  * G = 2G
+    (0x03, 0x01),  # 2^2  * G = 4G
+    (0x0D, 0x07),  # 2^3  * G = 8G
+    ...
+]
+```
+
+**Rollback constraint:** When reversing `P1 + P2 = Q`, one of P1 or P2 must be an addend (2^i * G). This filters invalid decomposition pairs.
+
+**Limitation on small curves:** On the 4-bit curve (N=19), all points are addends because the group is cyclic and small. The constraint has no effect. On secp256k1, only 256 of ~2^256 points are addends - massive filtering power.
+
+See `rollbackPointMultiply4bit.py` for implementation with `require_addend=True` filter.
+
 ## Partial Key Knowledge (Kangaroo)
 
 | Bits Unknown | Search Space | Kangaroo Steps | Feasibility |

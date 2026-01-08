@@ -1209,4 +1209,123 @@ print_table(headers, rows, "Results")
 
 ---
 
+## Recursive Candidate Filtering Pattern
+
+A pattern for exploring solution spaces where each step has multiple possibilities. Used in rollback algorithms (EEA mod_inverse, point addition) where we work backwards from a known result.
+
+### Core Components
+
+```python
+# 1. valid_candidates: List of solution paths being explored
+# Each candidate is a dict tracking accumulated state
+valid_candidates = [{
+    'current': start_value,      # Current position in search
+    'path': [],                  # Accumulated decisions/values
+    'steps': {0: initial_state}  # State at each depth for debugging
+}]
+
+# 2. step_candidates: All possibilities to try at each step
+def get_step_candidates(current):
+    """Return all valid next values from current position."""
+    return [...]  # List of possibilities
+
+# 3. extend_candidate: Create new candidate by adding one step
+def extend_candidate(cand, choice, depth):
+    """Extend candidate with a choice. Returns new candidate or None."""
+    new_steps = cand['steps'].copy()
+    new_steps[depth] = {'choice': choice, ...}
+    return {
+        'current': new_value,
+        'path': cand['path'] + [choice],
+        'steps': new_steps
+    }
+
+# 4. check_terminal: Detect when goal is reached
+def check_terminal(cand):
+    """Return True if candidate reached the goal."""
+    return cand['current'] == target
+
+# 5. recurse: Main loop filtering candidates depth by depth
+def recurse(depth, candidates):
+    if depth > max_depth or not candidates:
+        return candidates
+
+    # Check for solutions
+    for cand in candidates:
+        if check_terminal(cand):
+            found.append(cand)
+
+    # Extend each candidate with all possibilities
+    next_candidates = []
+    for cand in candidates:
+        for choice in get_step_candidates(cand['current']):
+            new_cand = extend_candidate(cand, choice, depth)
+            if new_cand:
+                next_candidates.append(new_cand)
+
+    return recurse(depth + 1, next_candidates)
+```
+
+### When to Use
+
+- **Rollback problems**: Reversing algorithms where forward direction loses information
+- **Search with branching**: Each state has multiple predecessors/successors
+- **Need to track history**: Must record the path taken, not just final answer
+- **Exponential but bounded**: Search space grows but depth is limited
+
+### Key Benefits
+
+1. **Tracks full history** in `steps` dict for debugging/verification
+2. **Handles branching** naturally - candidates multiply at each depth
+3. **Separates concerns**: step generation, extension, termination checks
+4. **Easy to add constraints**: Filter in `extend_candidate` or after
+
+### Examples in Codebase
+
+| File | What it searches | step_candidates | Terminal condition |
+|------|------------------|-----------------|-------------------|
+| `rollbackModInverseMechanism16bit.py` | EEA quotients | range(0, max_q) | old_s=1, s=0, r=p |
+| `rollbackPointAdd4bit.py` | Point pairs (P1,P2) | All pairs where P1+P2=Q | current == G |
+
+### Limits (Prevent Runaway)
+
+Always add limits to prevent infinite loops or memory exhaustion:
+
+```python
+def rollback_recursive(start, max_depth=3, max_candidates=None):
+    # Estimate max_candidates from problem parameters if not provided
+    branching_factor = estimate_branching()  # e.g., num_points * 2
+    if max_candidates is None:
+        max_candidates = branching_factor ** max_depth
+
+    def recurse(depth, candidates):
+        # Check limits at start of recursion
+        if depth > max_depth:
+            return candidates
+        if len(candidates) >= max_candidates:
+            print(f"Hit max_candidates={max_candidates}")
+            return candidates
+
+        # ... rest of recursion
+```
+
+| Limit | Purpose | How to Estimate |
+|-------|---------|-----------------|
+| `max_depth` | Bound recursion depth | Known from problem (e.g., EEA steps, scalar bits) |
+| `max_candidates` | Cap memory usage | `branching_factor ^ max_depth` |
+
+**Estimation examples:**
+- Point addition: `branching = num_curve_points * 2` (follow both P1 and P2)
+- EEA rollback: `branching = max_q` (quotient range)
+
+### Candidate Growth
+
+Candidates grow as `O(branching_factor ^ depth)`:
+- EEA rollback: ~100-500 possibilities per step
+- Point addition: ~17-34 possibilities per step (curve size)
+
+This exponential growth is **intentional** - it demonstrates why these problems are hard without additional constraints.
+
+---
+
 *This Python development guide is translated from the Node.js guide (`bitcoin/node.txt`) and prioritizes execution speed, token efficiency, and Pythonic code quality.*
