@@ -17,7 +17,9 @@
       "WebFetch(domain:lenschulwitz.com)",
       "WebFetch(domain:kjur.github.io)",
       "WebFetch(domain:chainquery.com)",
-      "WebFetch(domain:en.bitcoin.it)"
+      "WebFetch(domain:en.bitcoin.it)",
+      "Bash(pkill:*)",
+      "Bash(tasklist:*)"
     ],
     "deny": [],
     "ask": []

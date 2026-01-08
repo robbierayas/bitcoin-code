@@ -25,7 +25,7 @@ The seed in config.py variable MNEMONIC_12 is correct. It has been used to creat
 |------|----------------|
 | `CLAUDE.md` (this file) | Project overview, structure, module docs, test counts |
 | `claude.md.coder` | Python coding standards, async patterns, type hints |
-| `rollback/README.md` | ECDLP attack algorithms, complexity tables, 4-bit ECDSA usage |
+| `rollback/README.md` | ECDLP attacks, 4-bit ECDSA, mod inverse rollback (16-bit), EEA constraints (C1-C5) |
 | `reference/classical_ecdlp_algorithms.md` | Detailed ECDLP algorithms (Brute, BSGS, Pollard Rho/Kangaroo, Pohlig-Hellman), Bitcoin security analysis |
 | `reference/shor_algorithm.md` | Quantum Fourier Transform, Shor's algorithm math, quantum vs classical comparison, post-quantum crypto |
 | `reference/bitUtils.md` | **Bit-level math**: mod_inverse algorithm, why division destroys bit patterns, mathematical vs bit-level reversibility, slope calculation chain |
@@ -38,6 +38,8 @@ The seed in config.py variable MNEMONIC_12 is correct. It has been used to creat
 - Division and bit patterns? -> `reference/bitUtils.md` Section 1
 - Quantum attacks? -> `reference/shor_algorithm.md`
 - 4-bit ECDSA usage? -> `rollback/README.md`
+- EEA rollback constraints? -> `rollback/README.md` (C1-C5 table)
+- Why C4 division check is tautological? -> `rollback/README.md`
 - Python standards? -> `claude.md.coder`
 
 **Mod Inverse Rollback Note:**
@@ -67,7 +69,7 @@ Detailed docs in each folder's README:
 |--------|--------|-----------|
 | **cryptography/** | [cryptography/README.md](cryptography/README.md) | ecdsa4bit.py, ecdsaRR.py, keyUtils.py |
 | **bitcoin/** | [bitcoin/README.md](bitcoin/README.md) | txnUtils.py, msgUtils.py, wallet.py |
-| **rollback/** | [rollback/README.md](rollback/README.md) | 4-bit ECDSA attacks, complexity tables |
+| **rollback/** | [rollback/README.md](rollback/README.md) | 4-bit ECDSA attacks, mod inverse rollback (16-bit), complexity tables |
 
 ### config.py (Test Data)
 

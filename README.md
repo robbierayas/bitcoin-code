@@ -106,13 +106,17 @@ python test_myWallet.py      # 4 tests
 
 ### Rollback (Experimental)
 
-**Run:**
+**ECDSA rollback (4-bit):**
 ```bash
-cd bitcoin
-python myTransaction.py
+python rollback/bruteECDSA4bitMechanism.py
 ```
 
-**File:** `cryptography/rollback.py`
+**Mod inverse rollback (16-bit EEA):**
+```bash
+python rollback/rollbackModInverseMechanism16bit.py
+```
+
+See `rollback/README.md` for details on EEA constraint checking and why brute force produces multiple valid candidates.
 
 ---
 

@@ -191,6 +191,82 @@ python rollback/run.py --list-tests
 - Run from project root: `cd C:\Users\robbi\PycharmProjects\bitcoin-code`
 - Install deps: `pip install ecdsa pycryptodome`
 
+## Mod Inverse Rollback (EEA Reversal)
+
+Experimental rollback of the Extended Euclidean Algorithm (EEA) used in mod_inverse.
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `rollbackModInverseMechanism.py` | Original small-value demo (a=7, p=23) |
+| `rollbackModInverseMechanism4bit.py` | 4-bit test version |
+| `rollbackModInverseMechanism16bit.py` | 16-bit test (a=48271, p=65521) with full constraint checking |
+
+### Key Insight
+
+Integer division in EEA destroys bit relationships. Given only the final state `(old_r=1, r=0, old_s, s)`, the original input `a` cannot be uniquely recovered without the quotient sequence.
+
+### Constraint Logic (16-bit version)
+
+The brute force rollback applies these constraints to filter valid candidates:
+
+| Constraint | Description | Effectiveness |
+|------------|-------------|---------------|
+| C1 | old_r > r (remainders strictly decrease) | Filters invalid paths |
+| C2 | old_r <= p (bounded by modulus) | Limits search space |
+| C3 | r, old_r >= 0 (non-negative remainders) | Basic validity |
+| C4 | Division check: q = old_r // r | **Tautological** - always passes by construction |
+| C5 | Sign alternation of s coefficients | Filters some invalid paths |
+
+**Important**: Constraint C4 is tautological because `prev_old_r = curr_r + q * prev_r`, so `prev_old_r // prev_r` always equals `q` when `prev_r > 0`. This means the division check never filters candidates.
+
+### Why Multiple Solutions Exist
+
+For 16-bit test (a=48271, p=65521), brute force finds ~8000+ valid candidates. This happens because:
+1. The final quotient equals `prev_old_r` directly (when `prev_r = 1`)
+2. Without upper bounds, any `a < p` produces a valid EEA trace
+3. The constraints only enforce EEA structure, not uniqueness
+
+### Swap Step Detection
+
+The "swap step" (step 0) occurs when `a < p`. It's detected by:
+```python
+def is_swap_step(prev, q):
+    return prev['old_s'] == 1 and prev['s'] == 0 and q == 0
+```
+This step allows `old_r < r` (exception to constraint C1).
+
+### Candidate Data Structure
+
+Each candidate tracks its full rollback history:
+```python
+{
+    'qs': [q_last, q_prev, ..., q_first],  # Quotients from last to first step
+    'old_r': int,   # Current old_r value
+    'r': int,       # Current r value
+    'old_s': int,   # Current old_s value
+    's': int,       # Current s value
+    'steps': {      # State at each rollback step
+        step_num: {'old_r': ..., 'r': ..., 'old_s': ..., 's': ..., 'q': ...}
+    }
+}
+```
+
+### Run the 16-bit Demo
+
+```bash
+python rollback/rollbackModInverseMechanism16bit.py
+```
+
+Output shows:
+1. Forward EEA execution table
+2. Constraint checking trace
+3. Candidate filtering at each depth
+4. Final candidate count and reconstructed bits
+
+---
+
 ## RIPEMD-160 Rollback
 
 Experimental reverse-engineering of RIPEMD-160 hash function.

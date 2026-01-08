@@ -49,6 +49,25 @@
 
 ---
 
+## Development Workflow
+
+### Testing Strategy
+
+**Do NOT run tests after every code change.** Instead:
+
+1. **Use static analysis** - IDE diagnostics, type hints, linter warnings
+2. **Wait for user feedback** - User will paste any errors they encounter when running
+3. **Batch testing** - Only run tests when explicitly requested or at logical checkpoints
+
+**Rationale:** Running tests after every edit wastes time and tokens. The user has the IDE open and will see errors immediately. Trust static analysis for syntax/type errors.
+
+**When to run:**
+- User explicitly asks to run/test
+- After completing a logical unit of work (not after each edit)
+- When debugging a specific error the user reported
+
+---
+
 ## Python Best Practices and Code Quality
 
 ### Code Quality Standards
